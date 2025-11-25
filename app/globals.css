@@ -1,0 +1,305 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #FFC845;
+  --color-text: #000000;
+  --color-white: #FFFFFF;
+  --border-width: 3px;
+  --shadow-offset: 4px;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  /* On force une police sans-serif propre si Inter ne charge pas */
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Classes Utilitaires Néo-Brutalisme */
+
+/* Conteneur principal centré */
+.layout-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1rem;
+  /* Mobile first : moins de padding */
+  padding-bottom: 6rem;
+  /* Espace pour la navbar mobile */
+}
+
+@media (min-width: 768px) {
+  .layout-container {
+    padding: 2rem;
+    padding-bottom: 2rem;
+  }
+}
+
+/* Carte Blanche avec Bordure Noire et Ombre Dure */
+.neo-card {
+  background-color: var(--color-white);
+  border: var(--border-width) solid var(--color-text);
+  border-radius: 12px;
+  padding: 1rem;
+  /* Mobile : padding réduit */
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--color-text);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .neo-card {
+    padding: 1.5rem;
+    margin-bottom: 0;
+  }
+}
+
+.neo-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px var(--color-text);
+}
+
+/* Bouton Néo-Brutalisme */
+.neo-btn {
+  display: inline-flex;
+  /* Flex pour centrer le contenu */
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-text);
+  color: var(--color-white);
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.75rem 1.5rem;
+  /* Un peu plus compact sur mobile */
+  border: var(--border-width) solid var(--color-text);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px rgba(255, 255, 255, 0.5);
+  transition: all 0.1s;
+  width: 100%;
+  /* Pleine largeur sur mobile par défaut */
+}
+
+@media (min-width: 640px) {
+  .neo-btn {
+    width: auto;
+    /* Largeur auto sur tablette+ */
+  }
+}
+
+.neo-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px) 0px 0px rgba(255, 255, 255, 0.5);
+}
+
+.neo-btn:active {
+  transform: translate(0, 0);
+  box-shadow: 0 0 0 0;
+}
+
+.neo-btn-outline {
+  background-color: transparent;
+  color: var(--color-text);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--color-text);
+}
+
+/* Inputs */
+.neo-input {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: var(--border-width) solid var(--color-text);
+  border-radius: 8px;
+  background-color: var(--color-white);
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+
+.neo-input:focus {
+  box-shadow: 4px 4px 0px 0px var(--color-text);
+}
+
+/* Header */
+.neo-header {
+  background-color: var(--color-white);
+  border-bottom: var(--border-width) solid var(--color-text);
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* Navbar */
+.neo-nav {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--color-text);
+  padding: 0.5rem 1.5rem;
+  border-radius: 50px;
+  display: flex;
+  gap: 1.5rem;
+  box-shadow: 4px 4px 0px 0px rgba(255, 255, 255, 0.5);
+  z-index: 50;
+  width: 90%;
+  /* Largeur adaptée au mobile */
+  max-width: 400px;
+  justify-content: space-between;
+}
+
+.neo-nav-link {
+  color: var(--color-white);
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.neo-nav-link:hover,
+.neo-nav-link.active {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transform: scale(1.1);
+}
+/* ===== RETRO GAMING GENERATOR STYLES ===== */
+.retro-mode {
+  font-family: 'Press Start 2P', monospace;
+  background: radial-gradient(circle at center, #140f1c 0%, #09070d 100%);
+  color: #f8e6c1;
+  text-align: center;
+  padding: 20px;
+  border-radius: 15px;
+  border: 4px solid #000;
+}
+
+.retro-mode h2, .retro-mode p {
+  color: #ffcc66;
+  text-shadow: 2px 2px #000;
+}
+
+.retro-mode .crt {
+  position: relative;
+  overflow: hidden;
+}
+
+.retro-mode .crt::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255,255,255,0.05),
+    rgba(255,255,255,0.05) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+.retro-mode .generator-box {
+  background: #1a1525;
+  border: 4px solid #ffcc66;
+  border-radius: 8px;
+  box-shadow: 0 0 25px #ffcc66;
+  padding: 25px;
+  max-width: 600px;
+  margin: 30px auto;
+  position: relative;
+}
+
+.retro-mode .form-control-retro {
+  background: #0d0814;
+  border: 2px solid #8fd8ff;
+  color: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  width: 90%;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 8px #8fd8ff;
+  font-family: 'Press Start 2P', monospace;
+}
+
+.retro-mode .start-btn {
+  background: #8fd8ff;
+  border: none;
+  color: #0d0814;
+  font-size: 10px;
+  padding: 12px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px #8fd8ff, inset 0 0 4px #fff;
+  transition: 0.2s;
+  font-family: 'Press Start 2P', monospace;
+}
+
+.retro-mode .start-btn:hover {
+  background: #ffcc66;
+  box-shadow: 0 0 20px #ffcc66, inset 0 0 6px #fff;
+  color: #000;
+}
+
+.retro-mode .progress-bar-retro {
+  width: 90%;
+  height: 10px;
+  background: #2a2435;
+  border: 2px solid #ffcc66;
+  border-radius: 10px;
+  margin: 20px auto;
+  overflow: hidden;
+  box-shadow: inset 0 0 10px #000;
+}
+
+.retro-mode .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffcc66, #ff66cc, #8fd8ff);
+  background-size: 300% 100%;
+  animation: energyflow 2s linear infinite;
+  box-shadow: 0 0 15px #ffcc66;
+  transition: width 0.2s ease;
+}
+
+@keyframes energyflow {
+  0% { background-position: 300% 0; }
+  100% { background-position: -300% 0; }
+}
+
+.retro-mode .generated-img {
+  border: 3px solid #ffcc66;
+  margin-top: 30px;
+  max-width: 90%;
+  border-radius: 8px;
+  image-rendering: pixelated;
+  box-shadow: 0 0 25px rgba(255,204,102,0.3);
+}
+
+.retro-mode .particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #ffcc66;
+  opacity: 0.8;
+  border-radius: 50%;
+  animation: sparkle 3s linear infinite;
+}
+
+@keyframes sparkle {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(150px) scale(0); opacity: 0; }
+}
+

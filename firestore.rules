@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Permettre l'accès en lecture/écriture pour le développement
+    // ⚠️ ATTENTION: Ces règles sont permissives pour le développement
+    // Modifiez-les pour la production !
+    
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Note: Les règles spécifiques ci-dessous sont redondantes avec la règle générale
+    // mais sont conservées pour documentation
+    
+    // Règles pour les récompenses (tout le monde peut lire, seul l'admin peut écrire)
+    // La règle générale ci-dessus permet déjà cela
+    match /rewards/{rewardId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Règles pour les événements
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "ADMIN";
+    }
+    
+    
+    // Règles pour les coupons
+    match /coupons/{couponId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Permettre la mise à jour du statut uniquement
+      allow update: if request.auth != null && 
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasOnly(['userId', 'rewardId', 'rewardName', 'rewardIcon', 'rewardDescription', 'code', 'status', 'expiresAt', 'createdAt']) &&
+                       request.resource.data.status in ['active', 'expired', 'used'];
+      allow delete: if false;
+    }
+    
+    // Règles pour les badges
+    match /badges/{badgeId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
