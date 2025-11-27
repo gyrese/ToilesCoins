@@ -19,6 +19,7 @@ interface UserData {
     pseudo: string;
     avatar?: string;
     photoURL?: string;
+    bio?: string;
     role: "USER" | "ADMIN";
     balance: number;
     wins: number;

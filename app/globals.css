@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'PaybAck';
+  src: url('/fonts/PaybAck.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,6 +25,15 @@ body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+/* Font Utilities */
+.font-payback {
+  font-family: 'PaybAck', 'Black Ops One', cursive !important;
+}
+
+.font-impact {
+  font-family: Impact, 'Arial Black', sans-serif;
 }
 
 /* Classes Utilitaires Néo-Brutalisme */
@@ -171,6 +188,7 @@ body {
   color: var(--color-text);
   transform: scale(1.1);
 }
+
 /* ===== RETRO GAMING GENERATOR STYLES ===== */
 .retro-mode {
   font-family: 'Press Start 2P', monospace;
@@ -182,7 +200,8 @@ body {
   border: 4px solid #000;
 }
 
-.retro-mode h2, .retro-mode p {
+.retro-mode h2,
+.retro-mode p {
   color: #ffcc66;
   text-shadow: 2px 2px #000;
 }
@@ -195,14 +214,15 @@ body {
 .retro-mode .crt::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(255,255,255,0.05),
-    rgba(255,255,255,0.05) 1px,
-    transparent 1px,
-    transparent 2px
-  );
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(0deg,
+      rgba(255, 255, 255, 0.05),
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px,
+      transparent 2px);
   pointer-events: none;
   z-index: 5;
 }
@@ -275,8 +295,13 @@ body {
 }
 
 @keyframes energyflow {
-  0% { background-position: 300% 0; }
-  100% { background-position: -300% 0; }
+  0% {
+    background-position: 300% 0;
+  }
+
+  100% {
+    background-position: -300% 0;
+  }
 }
 
 .retro-mode .generated-img {
@@ -285,7 +310,7 @@ body {
   max-width: 90%;
   border-radius: 8px;
   image-rendering: pixelated;
-  box-shadow: 0 0 25px rgba(255,204,102,0.3);
+  box-shadow: 0 0 25px rgba(255, 204, 102, 0.3);
 }
 
 .retro-mode .particle {
@@ -299,7 +324,13 @@ body {
 }
 
 @keyframes sparkle {
-  0% { transform: translateY(0) scale(1); opacity: 1; }
-  100% { transform: translateY(150px) scale(0); opacity: 0; }
-}
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 
+  100% {
+    transform: translateY(150px) scale(0);
+    opacity: 0;
+  }
+}

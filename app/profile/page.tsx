@@ -2,17 +2,25 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { doc, updateDoc } from "firebase/firestore";
+import { collection, query, getDocs, doc, updateDoc, orderBy, limit, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import Navbar from "../components/Navbar";
 import Header from "../components/Header";
-import { Trophy, Coins, User, Zap, Download, Save } from "lucide-react";
+import { Settings, Trophy, Coins, User, Zap, Download, Save } from "lucide-react";
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 export default function Profile() {
     const { user, userData, loading } = useAuth();
     const router = useRouter();
 
+    const [badges, setBadges] = useState<any[]>([]);
+    const [leaderboard, setLeaderboard] = useState<any[]>([]);
+    const [lastEvent, setLastEvent] = useState<any>(null);
+    const [selectedBadge, setSelectedBadge] = useState<any>(null);
+    const [isEditing, setIsEditing] = useState(false);
+
+    // AI Avatar states
     const [generatedImage, setGeneratedImage] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [currentAvatar, setCurrentAvatar] = useState("");
@@ -21,71 +29,66 @@ export default function Profile() {
     const [progress, setProgress] = useState(0);
     const particlesRef = useRef<HTMLDivElement>(null);
 
+    // Edit profile states
+    const [editAvatar, setEditAvatar] = useState("");
+    const [editBio, setEditBio] = useState("");
+
+    // Level calculation (1-50)
+    const calculateLevel = () => {
+        if (!userData) return 1;
+        const xpWins = (userData.wins || 0) * 500;
+        const xpBadges = badges.length * 200; // Approximate if we don't have user's badges count directly here, but we fetched 'badges' collection. 
+        // Better: use userData.badges?.length if available, or just rely on wins for now as main driver + events.
+        // Let's assume 1 win = 500 XP, 1 event = 100 XP. Level up every 1000 XP.
+
+        const xp = ((userData.wins || 0) * 500) + ((userData.eventsCount || 0) * 100);
+        const lvl = Math.floor(xp / 1000) + 1;
+        return Math.min(50, lvl);
+    };
+
+    const level = calculateLevel();
+    const playerClass = level < 10 ? "Novice" : level < 25 ? "Initié" : level < 40 ? "Expert" : "Légende";
+
     useEffect(() => {
         if (!loading && !user) {
             router.push("/login");
             return;
         }
-        if (userData?.photoURL) {
-            setCurrentAvatar(userData.photoURL);
-        } else if (userData?.pseudo) {
-            setCurrentAvatar(`https://api.dicebear.com/9.x/avataaars/svg?seed=${userData.pseudo}&backgroundColor=ffc845`);
+        if (userData) {
+            setCurrentAvatar(userData.photoURL || `https://api.dicebear.com/9.x/avataaars/svg?seed=${userData.pseudo}&backgroundColor=ffc845`);
+            setEditAvatar(userData.photoURL || "");
+            setEditBio(userData.bio || "");
         }
     }, [user, loading, router, userData]);
 
-    // Effet particules
+    // Fetch Data
     useEffect(() => {
-        if (!particlesRef.current) return;
+        const fetchData = async () => {
+            if (!user || !userData) return;
 
-        const interval = setInterval(() => {
-            if (!particlesRef.current) return;
-            const p = document.createElement("div");
-            p.classList.add("particle");
-            p.style.left = Math.random() * 100 + "%";
-            p.style.animationDuration = 2 + Math.random() * 2 + "s";
-            particlesRef.current.appendChild(p);
-            setTimeout(() => p.remove(), 3000);
-        }, 500);
+            try {
+                // 1. Badges
+                const badgesSnap = await getDocs(collection(db, "badges"));
+                setBadges(badgesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-        return () => clearInterval(interval);
-    }, []);
+                // 2. Leaderboard
+                const usersSnap = await getDocs(query(collection(db, "users"), orderBy("wins", "desc"), limit(10)));
+                setLeaderboard(usersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-    const saveAsAvatar = async () => {
-        if (!user || !generatedImage) return;
-        setIsSaving(true);
-        try {
-            await updateDoc(doc(db, "users", user.uid), { photoURL: generatedImage });
-            setCurrentAvatar(generatedImage);
-            alert("✅ Nouvelle photo de profil définie !");
-        } catch (error) {
-            console.error(error);
-            alert("❌ Erreur lors de la sauvegarde");
-        } finally {
-            setIsSaving(false);
-        }
-    };
+                // 3. Last Event (Participation or Win)
+                const eventsSnap = await getDocs(query(collection(db, "events"), orderBy("date", "desc"), limit(20)));
+                const events = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const myLastEvent = events.find((e: any) => e.winner === userData.pseudo || e.secondPlace === userData.pseudo);
+                setLastEvent(myLastEvent);
 
-    const downloadImage = async () => {
-        if (!generatedImage) return;
-        try {
-            const response = await fetch(generatedImage);
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `creation-ia-${Date.now()}.jpg`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Erreur téléchargement:", error);
-            // Fallback si le fetch échoue (CORS)
-            window.open(generatedImage, '_blank');
-        }
-    };
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        };
+        fetchData();
+    }, [user, userData]);
 
-    const generateAIImage = async () => {
+    const handleGenerateAvatar = async () => {
         if (!aiPrompt.trim()) {
             alert("🕹️ Entre une description !");
             return;
@@ -95,7 +98,6 @@ export default function Profile() {
         setGeneratedImage("");
         setProgress(0);
 
-        // Animation de chargement
         const interval = setInterval(() => {
             setProgress(prev => {
                 if (prev >= 95) return prev;
@@ -113,12 +115,8 @@ export default function Profile() {
             if (!response.ok) throw new Error("Erreur de génération");
 
             const data = await response.json();
-
-            // Simulation de fin de chargement
             clearInterval(interval);
             setProgress(100);
-
-            // Petit délai pour l'effet
             setTimeout(() => {
                 setGeneratedImage(data.imageUrl);
                 setIsGenerating(false);
@@ -131,145 +129,468 @@ export default function Profile() {
         }
     };
 
-    if (loading || (user && !userData)) {
-        return <div className="min-h-screen flex items-center justify-center font-bold text-xl bg-[#FFC845]">CHARGEMENT...</div>;
-    }
-    if (!user) return null;
+    const handleSaveProfile = async () => {
+        if (!user) return;
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                photoURL: editAvatar || currentAvatar,
+                bio: editBio
+            });
+            setIsEditing(false);
+        } catch (error) {
+            console.error(error);
+            alert("Erreur sauvegarde");
+        }
+    };
+
+    const getPseudoClass = () => {
+        if (level >= 50) return "pseudo-level-50";
+        if (level >= 45) return "pseudo-level-45";
+        if (level >= 40) return "pseudo-level-40";
+        if (level >= 35) return "pseudo-level-35";
+        if (level >= 30) return "pseudo-level-30";
+        if (level >= 25) return "pseudo-level-25";
+        if (level >= 20) return "pseudo-level-20";
+        if (level >= 10) return "pseudo-level-10";
+        return "pseudo-level-1";
+    };
+
+    if (loading || !userData) return <div className="min-h-screen flex items-center justify-center font-bold text-xl bg-[#FFC845]">CHARGEMENT...</div>;
 
     return (
         <>
-            <Header />
-            <main className="layout-container pb-32">
-                <div className="mb-8">
-                    <h1 className="text-4xl font-black uppercase italic mb-2">👤 Mon Profil</h1>
-                    <p className="font-bold opacity-70">Zone Créative & Identité</p>
-                </div>
+            <style jsx global>{`
+                .profile-card {
+                    position: relative;
+                    background-color: white;
+                    border: 5px solid black;
+                    border-radius: 30px;
+                    box-shadow: 10px 10px 0px 0px #FFC845;
+                }
+                .level-badge {
+                    position: absolute;
+                    top: -20px;
+                    left: -10px;
+                    background-color: #FFC845;
+                    border: 4px solid black;
+                    border-radius: 50px;
+                    padding: 5px 20px;
+                    font-family: Impact, sans-serif;
+                    font-size: 1.2rem;
+                    z-index: 10;
+                }
+                .avatar-container {
+                    border: 5px solid black;
+                    border-radius: 20px;
+                    overflow: hidden;
+                    background-color: white;
+                    aspect-ratio: 1/1;
+                }
+                .solde-bar {
+                    background-color: black;
+                    border-radius: 50px;
+                    color: #FFC845;
+                    border: 5px solid black;
+                }
+                .trophies-section {
+                    background-color: black;
+                    border-radius: 30px;
+                    border: 5px solid black;
+                    overflow: hidden;
+                }
+                .trophies-title {
+                    writing-mode: vertical-rl;
+                    transform: rotate(180deg);
+                    color: #FFC845;
+                    font-family: Impact, sans-serif;
+                    font-size: 2rem;
+                    text-align: center;
+                    padding: 10px 0;
+                    border-left: 2px solid #FFC845;
+                }
+                .activity-card {
+                    background-color: #FFC845;
+                    border: 5px solid black;
+                    border-radius: 30px;
+                }
+                .admin-btn {
+                    background-color: black;
+                    color: #FFC845;
+                    border: 4px solid black;
+                    border-radius: 50px;
+                    font-family: Impact, sans-serif;
+                    font-size: 1.5rem;
+                    padding: 10px 40px;
+                    transition: transform 0.2s;
+                }
+                .admin-btn:hover {
+                    transform: scale(1.05);
+                    color: white;
+                }
+                
+                /* RPG Effects - Level 1 to 50 */
+                [class^="pseudo-level-"] {
+                    font-family: 'PaybAck', 'Black Ops One', cursive;
+                    transition: all 0.3s ease;
+                }
 
-                {/* Profile Card */}
-                <div className="neo-card !bg-gradient-to-br from-purple-400 to-pink-500 !border-purple-600 mb-12 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
-                    <div className="relative z-10">
-                        <div className="flex flex-col md:flex-row items-center gap-6">
-                            <div className="relative">
-                                <div className="w-32 h-32 rounded-full border-4 border-black overflow-hidden bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={currentAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                                </div>
-                                <div className="absolute -bottom-2 -right-2 bg-yellow-400 border-2 border-black rounded-full p-2">
-                                    <Zap size={20} className="text-black" />
-                                </div>
+                /* Levels 1-9: Novice */
+                .pseudo-level-1 { 
+                    font-size: 2rem; 
+                    color: black;
+                }
+                
+                /* Levels 10-19: Initié Bronze */
+                .pseudo-level-10 { 
+                    font-size: 2.2rem; 
+                    color: #333;
+                    text-shadow: 2px 2px 0px #FFC845;
+                }
+
+                /* Levels 20-29: Initié Argent */
+                .pseudo-level-20 { 
+                    font-size: 2.4rem; 
+                    color: #4a4a4a;
+                    text-shadow: 3px 3px 0px #FFC845, 0 0 10px rgba(0,0,0,0.2);
+                    letter-spacing: 1px;
+                }
+
+                /* Levels 25-29: Initié Or */
+                .pseudo-level-25 { 
+                    font-size: 2.5rem; 
+                    color: #2c2c2c;
+                    text-shadow: 3px 3px 0px #FFC845, 0 0 15px rgba(255, 200, 69, 0.4);
+                    letter-spacing: 1.5px;
+                    animation: subtle-glow 3s ease-in-out infinite;
+                }
+
+                /* Levels 30-39: Expert */
+                .pseudo-level-30 { 
+                    font-size: 2.6rem; 
+                    background: linear-gradient(45deg, #000, #444, #000);
+                    background-size: 200% 200%;
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    filter: drop-shadow(3px 3px 0px #FFC845) drop-shadow(0 0 8px rgba(0,0,0,0.4));
+                    animation: gradient-shift 4s ease infinite;
+                }
+
+                .pseudo-level-35 { 
+                    font-size: 2.7rem; 
+                    background: linear-gradient(45deg, #000, #555, #000);
+                    background-size: 200% 200%;
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    filter: drop-shadow(4px 4px 0px #FFC845) drop-shadow(0 0 12px rgba(255, 200, 69, 0.5));
+                    animation: gradient-shift 3s ease infinite, float 4s ease-in-out infinite;
+                }
+
+                /* Levels 40-49: Légende */
+                .pseudo-level-40 { 
+                    font-size: 2.8rem; 
+                    color: white;
+                    -webkit-text-stroke: 1px black;
+                    text-shadow: 4px 4px 0px #000, 0 0 15px #FFC845, 0 0 25px rgba(255, 200, 69, 0.3);
+                    animation: float 3s ease-in-out infinite, glow-pulse 2s ease-in-out infinite;
+                }
+
+                .pseudo-level-45 { 
+                    font-size: 3rem; 
+                    color: #FFE55C;
+                    -webkit-text-stroke: 1.5px black;
+                    text-shadow: 4px 4px 0px #000, 0 0 20px #FFC845, 0 0 30px #FFD700;
+                    animation: float 2.5s ease-in-out infinite, glow-pulse 1.8s ease-in-out infinite;
+                }
+
+                /* Level 50: MAX LEVEL - Legendary */
+                .pseudo-level-50 { 
+                    font-size: 3.2rem; 
+                    background: linear-gradient(45deg, #FFD700, #FFA500, #FFD700, #FF4500);
+                    background-size: 300% 300%;
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    -webkit-text-stroke: 2px black;
+                    filter: drop-shadow(5px 5px 0px #000) drop-shadow(0 0 20px #FFD700) drop-shadow(0 0 40px #FF4500);
+                    animation: pulse 2s infinite, shine 3s linear infinite, float 4s ease-in-out infinite;
+                }
+                
+                /* Animations */
+                @keyframes pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+
+                @keyframes float {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-5px); }
+                }
+
+                @keyframes shine {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+
+                @keyframes gradient-shift {
+                    0%, 100% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                }
+
+                @keyframes glow-pulse {
+                    0%, 100% { filter: drop-shadow(4px 4px 0px #000) drop-shadow(0 0 15px #FFC845); }
+                    50% { filter: drop-shadow(4px 4px 0px #000) drop-shadow(0 0 25px #FFC845) drop-shadow(0 0 35px rgba(255, 200, 69, 0.5)); }
+                }
+
+                @keyframes subtle-glow {
+                    0%, 100% { text-shadow: 3px 3px 0px #FFC845, 0 0 15px rgba(255, 200, 69, 0.4); }
+                    50% { text-shadow: 3px 3px 0px #FFC845, 0 0 20px rgba(255, 200, 69, 0.6); }
+                }
+            `}</style>
+
+            <Header />
+
+            <main className="container py-5 mt-5" style={{ maxWidth: '600px' }}>
+                <div className="profile-card p-4 mb-4">
+                    <div className="level-badge">LEVEL {level}</div>
+                    <button
+                        className="position-absolute top-0 end-0 m-3 btn btn-dark rounded-circle d-flex align-items-center justify-content-center"
+                        style={{
+                            width: '50px',
+                            height: '50px',
+                            zIndex: 10,
+                            border: '3px solid #FFC845',
+                            boxShadow: '3px 3px 0px 0px rgba(0,0,0,0.3)',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => setIsEditing(true)}
+                    >
+                        <Settings size={24} color="#FFC845" strokeWidth={2.5} />
+                    </button>
+                    <div className="row align-items-center">
+                        <div className="col-5">
+                            <div className="avatar-container">
+                                {currentAvatar && (
+                                    <img src={currentAvatar} alt="Avatar" className="img-fluid w-100 h-100 object-fit-cover" />
+                                )}
                             </div>
-                            <div className="flex-1 text-center md:text-left">
-                                <h2 className="text-3xl font-black uppercase text-white mb-1">{userData?.pseudo}</h2>
-                                <p className="font-bold text-white/80 mb-4 flex items-center gap-2 justify-center md:justify-start">
-                                    <User size={16} />
-                                    {user.email}
-                                </p>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-white/90 backdrop-blur rounded-lg p-3 border-2 border-black">
-                                        <div className="flex items-center gap-2 justify-center mb-1">
-                                            <Coins className="text-yellow-600" size={20} />
-                                            <span className="text-xs font-bold opacity-70">SOLDE</span>
-                                        </div>
-                                        <div className="text-2xl font-black">{userData?.balance || 0} <span className="text-yellow-600">TC</span></div>
-                                    </div>
-                                    <div className="bg-white/90 backdrop-blur rounded-lg p-3 border-2 border-black">
-                                        <div className="flex items-center gap-2 justify-center mb-1">
-                                            <Trophy className="text-purple-600" size={20} />
-                                            <span className="text-xs font-bold opacity-70">VICTOIRES</span>
-                                        </div>
-                                        <div className="text-2xl font-black">{userData?.wins || 0}</div>
-                                    </div>
-                                </div>
-                            </div>
+                        </div>
+                        <div className="col-7">
+                            <h1 className={`font-payback text-uppercase mb-0 ${getPseudoClass()}`}>{userData?.pseudo}</h1>
+                            <div className="font-weight-bold text-uppercase mb-2">{playerClass}</div>
+                            <p className="font-italic mb-0 small">
+                                "{userData?.bio || "Pas de devise"}"
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                {/* ===== RETRO GENERATOR SECTION ===== */}
-                <div className="retro-mode crt">
-                    <div className="section-title">
-                        <h2>Les Toiles Noires</h2>
-                        <p>🕹️ Studio de Création IA 🎨</p>
+                <div className="solde-bar d-flex justify-content-between align-items-center px-4 py-2 mb-4">
+                    <span className="font-impact h2 mb-0">SOLDE</span>
+                    <span className="font-impact h2 mb-0">{userData?.balance || 0} TC</span>
+                </div>
+
+                <div className="trophies-section d-flex mb-4">
+                    <div className="trophies-title d-flex align-items-center justify-content-center bg-black px-2">
+                        BADGES
                     </div>
-
-                    <div className="generator-box">
-                        <div className="particles" ref={particlesRef}></div>
-
-                        <input
-                            type="text"
-                            className="form-control-retro"
-                            placeholder="Ex: paysage cyberpunk, dragon en or, logo futuriste..."
-                            value={aiPrompt}
-                            onChange={(e) => setAiPrompt(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && generateAIImage()}
-                        />
-
-                        <button
-                            className="start-btn"
-                            onClick={generateAIImage}
-                            disabled={isGenerating}
-                        >
-                            {isGenerating ? "DISTILLATION..." : "▶ GÉNÉRER L'IMAGE"}
-                        </button>
-
-                        {isGenerating && (
-                            <div style={{ marginTop: '25px' }}>
-                                <div style={{ fontSize: '10px', color: '#ffcc66', marginBottom: '10px' }}>
-                                    CRÉATION DE L'IMAGE EN COURS...
+                    <div className="flex-grow-1 d-flex flex-nowrap align-items-center py-3 px-2 gap-3 hide-scrollbar" style={{ overflowX: 'auto' }}>
+                        {badges.length > 0 ? (
+                            badges.map((badge) => (
+                                <div key={badge.id} className="text-center flex-shrink-0" style={{ width: '80px', cursor: 'pointer' }} onClick={() => setSelectedBadge(badge)}>
+                                    <div className="mb-2" style={{ width: '60px', height: '60px', margin: '0 auto' }}>
+                                        <img src={badge.icon} alt={badge.name} className="w-100 h-100 object-fit-contain" onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                            (e.target as HTMLImageElement).parentElement!.innerText = '🏆';
+                                        }} />
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#FFD95A' }}>
+                                        {badge.name}
+                                    </div>
                                 </div>
-                                <div className="progress-bar-retro">
-                                    <div className="progress-fill" style={{ width: `${progress}%` }}></div>
-                                </div>
-                            </div>
+                            ))
+                        ) : (
+                            <div className="text-white opacity-50 text-center w-100 small">Aucun badge disponible</div>
                         )}
-
-                        {generatedImage && !isGenerating && (
-                            <div className="animate-in fade-in zoom-in duration-500">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                    key={generatedImage} // Force re-render
-                                    src={`${generatedImage}&t=${Date.now()}`} // Force new request
-                                    alt="Generated Art"
-                                    className="generated-img"
-                                    onError={(e) => {
-                                        console.error("Erreur chargement image");
-                                        e.currentTarget.style.display = 'none';
-                                    }}
-                                />
-
-                                <div className="mt-4 flex flex-col gap-3 justify-center items-center">
-                                    {/* Bouton Télécharger */}
-                                    <button
-                                        className="start-btn"
-                                        style={{ background: '#8fd8ff', color: 'black', width: '100%', maxWidth: '300px' }}
-                                        onClick={downloadImage}
-                                    >
-                                        <Download size={16} className="inline mr-2" />
-                                        💾 TÉLÉCHARGER
-                                    </button>
-
-                                    {/* Bouton Définir en Avatar */}
-                                    <button
-                                        className="start-btn"
-                                        style={{ background: '#ffcc66', color: 'black', width: '100%', maxWidth: '300px' }}
-                                        onClick={saveAsAvatar}
-                                        disabled={isSaving}
-                                    >
-                                        {isSaving ? "SAUVEGARDE..." : (
-                                            <>
-                                                <Save size={16} className="inline mr-2" />
-                                                DÉFINIR EN AVATAR
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
+                        {badges.length < 4 && (
+                            <div className="text-center opacity-25 flex-shrink-0" style={{ width: '80px' }}>
+                                <div className="h1 mb-0" style={{ fontSize: '2.5rem' }}>🔒</div>
                             </div>
                         )}
                     </div>
                 </div>
 
+                <div className="activity-card p-0 mb-5 overflow-hidden">
+                    <div className="text-center border-bottom border-dark border-3 py-2">
+                        <h2 className="font-impact mb-0">DERNIERE ACTIVITÉ</h2>
+                    </div>
+                    {lastEvent ? (
+                        <div className="d-flex align-items-center p-3">
+                            <div className="me-3">
+                                {lastEvent.imageUrl ? (
+                                    <div style={{ width: '80px', height: '80px', backgroundColor: 'white', border: '3px solid black', borderRadius: '10px', overflow: 'hidden' }}>
+                                        <img src={lastEvent.imageUrl} alt="" className="w-100 h-100 object-fit-cover" />
+                                    </div>
+                                ) : (
+                                    <div style={{ width: '80px', height: '80px', backgroundColor: 'white', border: '3px solid black', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
+                                        {lastEvent.eventType?.emoji || "🏆"}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-grow-1">
+                                <div className="font-bold text-uppercase">{lastEvent.name}</div>
+                                <div className="small opacity-75">{lastEvent.date?.toDate ? new Date(lastEvent.date.toDate()).toLocaleDateString() : "Date inconnue"}</div>
+                            </div>
+                            <div className="text-end">
+                                <span className="font-impact display-4">
+                                    {lastEvent.winner === userData?.pseudo ? "1er" : "2ème"}
+                                </span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="p-4 text-center opacity-50 font-bold">
+                            Aucune activité récente
+                        </div>
+                    )}
+                </div>
+
+                {/* CLASSEMENT / LEADERBOARD */}
+                <div className="activity-card p-0 mb-5 overflow-hidden">
+                    <div className="text-center border-bottom border-dark border-3 py-2 bg-black text-[#FFC845]">
+                        <h2 className="font-impact mb-0 text-[#FFC845]">CLASSEMENT</h2>
+                    </div>
+                    <div className="p-0">
+                        {leaderboard.map((player, index) => (
+                            <div key={player.id} className={`d-flex align-items-center p-3 border-bottom border-dark ${player.pseudo === userData?.pseudo ? 'bg-warning bg-opacity-25' : ''}`}>
+                                <div className="font-impact h3 mb-0 me-3 w-10 text-center">
+                                    #{index + 1}
+                                </div>
+                                <div className="me-3">
+                                    <img
+                                        src={player.photoURL || `https://api.dicebear.com/9.x/avataaars/svg?seed=${player.pseudo}&backgroundColor=ffc845`}
+                                        alt={player.pseudo}
+                                        className="rounded-circle border border-2 border-dark"
+                                        style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                    />
+                                </div>
+                                <div className="flex-grow-1">
+                                    <div className="font-bold text-uppercase">{player.pseudo}</div>
+                                    <div className="small font-monospace">Niveau {Math.floor((player.wins || 0) / 5) + 1}</div>
+                                </div>
+                                <div className="text-end font-bold">
+                                    {player.wins} 🏆
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="text-center mb-5">
+                    <button className="btn admin-btn" onClick={() => router.push('/admin')}>ADMIN</button>
+                </div>
             </main>
+
+            {selectedBadge && (
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1050 }} onClick={() => setSelectedBadge(null)}>
+                    <div className="bg-white p-4 text-center position-relative" style={{ maxWidth: '90%', width: '350px', border: '5px solid black', borderRadius: '20px', boxShadow: '10px 10px 0px 0px #FFD95A' }} onClick={(e) => e.stopPropagation()}>
+                        <button className="position-absolute top-0 end-0 m-2 btn-close" onClick={() => setSelectedBadge(null)}></button>
+                        <div className="mb-3 mx-auto" style={{ width: '100px', height: '100px' }}>
+                            <img src={selectedBadge.icon} alt={selectedBadge.name} className="w-100 h-100 object-fit-contain" />
+                        </div>
+                        <h2 className="font-black text-uppercase mb-2" style={{ fontFamily: 'Impact, sans-serif' }}>{selectedBadge.name}</h2>
+                        <div className="border-top border-dark border-2 w-50 mx-auto mb-3"></div>
+                        <p className="font-weight-bold mb-4">{selectedBadge.description}</p>
+                        <div className="bg-black text-warning p-2 rounded font-monospace small">
+                            CONDITION: {selectedBadge.conditionType === 'wins' && `🏆 ${selectedBadge.conditionValue} Victoires`}
+                            {selectedBadge.conditionType === 'balance' && `💰 ${selectedBadge.conditionValue} TC`}
+                            {selectedBadge.conditionType === 'events' && `📅 ${selectedBadge.conditionValue} Événements`}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isEditing && (
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1055 }} onClick={() => setIsEditing(false)}>
+                    <div className="bg-white p-4 position-relative" style={{ maxWidth: '90%', width: '450px', border: '5px solid black', borderRadius: '20px', boxShadow: '10px 10px 0px 0px #FFD95A' }} onClick={(e) => e.stopPropagation()}>
+                        <button className="position-absolute top-0 end-0 m-2 btn-close" onClick={() => setIsEditing(false)}></button>
+                        <h2 className="font-impact text-center mb-4">ÉDITER LE PROFIL</h2>
+
+                        {/* AI Avatar Generator */}
+                        <div className="mb-3 p-3 border border-dark border-3 rounded" style={{ backgroundColor: '#f8f9fa' }}>
+                            <label className="form-label font-weight-bold d-flex align-items-center gap-2">
+                                <span>🎨</span> GÉNÉRER AVATAR IA
+                            </label>
+                            <input
+                                type="text"
+                                className="form-control border-2 border-dark mb-2"
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                placeholder="Ex: un chat cyberpunk avec des lunettes..."
+                                disabled={isGenerating}
+                            />
+                            <button
+                                className="btn btn-warning w-100 font-weight-bold border-2 border-dark"
+                                onClick={handleGenerateAvatar}
+                                disabled={isGenerating}
+                            >
+                                {isGenerating ? '⏳ Génération en cours...' : '✨ Générer avec IA'}
+                            </button>
+
+                            {/* Barre de progression */}
+                            {isGenerating && (
+                                <div className="mt-3">
+                                    <div className="progress" style={{ height: '25px', border: '3px solid black', borderRadius: '10px' }}>
+                                        <div
+                                            className="progress-bar progress-bar-striped progress-bar-animated bg-warning"
+                                            role="progressbar"
+                                            style={{ width: '100%', fontSize: '0.9rem', fontWeight: 'bold', color: 'black' }}
+                                        >
+                                            🎨 Création de votre avatar magique...
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Preview */}
+                            {generatedImage && (
+                                <div className="mt-3 text-center">
+                                    <img src={generatedImage} alt="Avatar généré" className="img-fluid rounded border border-dark border-3" style={{ maxWidth: '200px', maxHeight: '200px' }} />
+                                    <div className="small text-success mt-2 font-weight-bold">✅ Avatar généré ! Il sera utilisé automatiquement.</div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mb-3">
+                            <label className="form-label font-weight-bold">AVATAR (URL)</label>
+                            <input
+                                type="text"
+                                className="form-control border-3 border-dark"
+                                value={editAvatar}
+                                onChange={(e) => setEditAvatar(e.target.value)}
+                                placeholder="https://..."
+                            />
+                            <div className="form-text small">Ou collez un lien d'image existant</div>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="form-label font-weight-bold">DEVISE (BIO)</label>
+                            <textarea
+                                className="form-control border-3 border-dark"
+                                rows={3}
+                                value={editBio}
+                                onChange={(e) => setEditBio(e.target.value)}
+                                placeholder="Votre phrase fétiche..."
+                            ></textarea>
+                        </div>
+
+                        <button className="btn btn-dark w-100 font-impact py-2" style={{ fontSize: '1.2rem' }} onClick={handleSaveProfile}>
+                            SAUVEGARDER
+                        </button>
+                    </div>
+                </div>
+            )}
             <Navbar />
         </>
     );

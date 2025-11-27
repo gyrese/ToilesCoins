@@ -50,10 +50,10 @@ export default function Home() {
       <Header />
       <main className="min-h-screen bg-[#FFD95A] text-black pb-32 pt-32 px-4 font-sans">
 
-        <div className="max-w-md mx-auto">
+        <div className="max-w-2xl mx-auto">
 
           {/* --- 1. BANDEAU PROFIL COMPACT (Demandé précédemment) --- */}
-          <div className="bg-white border-2 border-black rounded-full p-2 pr-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3 mb-8">
+          <div className="bg-white border-2 border-black rounded-full p-2 pr-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3 mb-8 max-w-md mx-auto">
             <div className="w-12 h-12 flex-shrink-0 rounded-full border-2 border-black overflow-hidden bg-gray-200">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={avatarUrl} alt="Profil" className="w-full h-full object-cover" />
@@ -73,7 +73,7 @@ export default function Home() {
 
 
           {/* --- 3. STATS CARDS (Style Image) --- */}
-          <div className="flex flex-col gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
 
             {/* Carte SOLDE (Noire) */}
             <div className="bg-black text-white p-6 rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]">

@@ -13,6 +13,7 @@
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/ios": "^7.4.4",
+    "@fontsource/black-ops-one": "^5.2.8",
     "bootstrap": "^5.3.8",
     "firebase": "^12.6.0",
     "lucide-react": "^0.554.0",

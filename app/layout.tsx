@@ -23,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <head>
-        <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Press+Start+2P&display=swap" rel="stylesheet" />
       </head>
       <body className={inter.className}>
         <ClientLayout>

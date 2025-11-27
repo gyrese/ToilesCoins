@@ -12,23 +12,49 @@ export async function POST(request: NextRequest) {
         }
 
         // Utilisation de Pollinations.ai
-        // On simplifie les paramètres pour garantir la stabilité
         const seed = Math.floor(Math.random() * 1000000);
         const encodedPrompt = encodeURIComponent(prompt);
-
-        // On utilise le modèle par défaut qui est le plus rapide et stable
-        // On garde nologo=true
         const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true`;
 
-        return NextResponse.json({
-            imageUrl,
-            provider: "pollinations"
-        });
+        // Vérification que l'image est bien générée
+        const maxRetries = 3;
+        let lastError;
 
-    } catch (error) {
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+                const response = await fetch(imageUrl, {
+                    method: 'GET',
+                    signal: controller.signal,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0'
+                    }
+                });
+
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    // On retourne l'URL directement au client
+                    return NextResponse.json({ imageUrl });
+                }
+
+                lastError = `HTTP ${response.status}: ${response.statusText}`;
+            } catch (err: any) {
+                lastError = err.message;
+                if (i < maxRetries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+                }
+            }
+        }
+
+        throw new Error(`Échec après ${maxRetries} tentatives: ${lastError}`);
+
+    } catch (error: any) {
         console.error('Erreur génération image:', error);
         return NextResponse.json(
-            { error: 'Erreur serveur' },
+            { error: error.message || 'Erreur serveur' },
             { status: 500 }
         );
     }
