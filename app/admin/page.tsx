@@ -180,7 +180,7 @@ export default function Admin() {
 
                 // Trier par date décroissante
 
-                eventsData.sort((a, b) => {
+                eventsData.sort((a: any, b: any) => {
 
                     const dateA = a.date?.toDate?.() || new Date(a.date);
 
@@ -736,7 +736,7 @@ export default function Admin() {
 
             const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            eventsData.sort((a, b) => {
+            eventsData.sort((a: any, b: any) => {
 
                 const dateA = a.date?.toDate?.() || new Date(a.date);
 
@@ -888,7 +888,7 @@ export default function Admin() {
 
             const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            eventsData.sort((a, b) => {
+            eventsData.sort((a: any, b: any) => {
 
                 const dateA = a.date?.toDate?.() || new Date(a.date);
 
@@ -1758,7 +1758,7 @@ export default function Admin() {
 
                                         });
 
-                                        setevents(eventsData);
+                                        setEvents(eventsData);
 
 
 
