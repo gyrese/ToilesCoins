@@ -32,6 +32,7 @@ export default function Profile() {
     // Edit profile states
     const [editAvatar, setEditAvatar] = useState("");
     const [editBio, setEditBio] = useState("");
+    const [editPseudo, setEditPseudo] = useState("");
 
     // Level calculation (1-50)
     const calculateLevel = () => {
@@ -58,6 +59,7 @@ export default function Profile() {
             setCurrentAvatar(userData.photoURL || `https://api.dicebear.com/9.x/avataaars/svg?seed=${userData.pseudo}&backgroundColor=ffc845`);
             setEditAvatar(userData.photoURL || "");
             setEditBio(userData.bio || "");
+            setEditPseudo(userData.pseudo || "");
         }
     }, [user, loading, router, userData]);
 
@@ -131,8 +133,16 @@ export default function Profile() {
 
     const handleSaveProfile = async () => {
         if (!user) return;
+
+        // Validation du pseudo
+        if (!editPseudo || editPseudo.trim().length < 3) {
+            alert("Le pseudo doit contenir au moins 3 caractères");
+            return;
+        }
+
         try {
             await updateDoc(doc(db, "users", user.uid), {
+                pseudo: editPseudo.trim(),
                 photoURL: editAvatar || currentAvatar,
                 bio: editBio
             });
@@ -560,6 +570,20 @@ export default function Profile() {
                                     <div className="small text-success mt-2 font-weight-bold">✅ Avatar généré ! Il sera utilisé automatiquement.</div>
                                 </div>
                             )}
+                        </div>
+
+                        <div className="mb-3">
+                            <label className="form-label font-weight-bold">PSEUDO</label>
+                            <input
+                                type="text"
+                                className="form-control border-3 border-dark"
+                                value={editPseudo}
+                                onChange={(e) => setEditPseudo(e.target.value)}
+                                placeholder="Votre pseudo"
+                                minLength={3}
+                                required
+                            />
+                            <div className="form-text small">Minimum 3 caractères</div>
                         </div>
 
                         <div className="mb-3">

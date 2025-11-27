@@ -13,6 +13,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "ToilesCoins - Les Toiles Noires",
   description: "Monnaie virtuelle et fidélité pour Les Toiles Noires",
+  icons: {
+    icon: '/icon.jpg',
+    apple: '/icon.jpg',
+  },
 };
 
 export default function RootLayout({

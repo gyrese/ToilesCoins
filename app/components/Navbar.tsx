@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Wallet, ShoppingBag, User, ShieldAlert, Ticket } from "lucide-react";
+import { Home, ShoppingBag, User, ShieldAlert, Ticket, Calendar } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Navbar() {
@@ -17,16 +17,16 @@ export default function Navbar() {
                 <Home size={24} strokeWidth={3} />
             </Link>
 
-            <Link href="/wallet" className={`neo-nav-link ${isActive('/wallet') ? 'active' : ''}`}>
-                <Wallet size={24} strokeWidth={3} />
-            </Link>
-
             <Link href="/shop" className={`neo-nav-link ${isActive('/shop') ? 'active' : ''}`}>
                 <ShoppingBag size={24} strokeWidth={3} />
             </Link>
 
             <Link href="/coupons" className={`neo-nav-link ${isActive('/coupons') ? 'active' : ''}`}>
                 <Ticket size={24} strokeWidth={3} />
+            </Link>
+
+            <Link href="/events" className={`neo-nav-link ${isActive('/events') ? 'active' : ''}`}>
+                <Calendar size={24} strokeWidth={3} />
             </Link>
 
             <Link href="/profile" className={`neo-nav-link ${isActive('/profile') ? 'active' : ''}`}>
