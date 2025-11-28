@@ -14,8 +14,12 @@ export default function Home() {
   const [playerClass, setPlayerClass] = useState("Novice");
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
+    if (!loading) {
+      if (!user) {
+        router.push("/login");
+      } else {
+        router.push("/dashboard");
+      }
     }
   }, [user, loading, router]);
 
