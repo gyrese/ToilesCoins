@@ -38,13 +38,7 @@ export default function Admin() {
 
 
 
-    // Events State
 
-    const [eventTitle, setEventTitle] = useState("");
-
-    const [eventDate, setEventDate] = useState("");
-
-    const [eventReward, setEventReward] = useState("");
 
 
 
@@ -304,43 +298,7 @@ export default function Admin() {
 
 
 
-    const handleCreateEvent = async (e: React.FormEvent) => {
 
-        e.preventDefault();
-
-        setMessage("");
-
-        try {
-
-            await addDoc(collection(db, "events"), {
-
-                title: eventTitle,
-
-                date: new Date(eventDate).toISOString(),
-
-                reward: parseInt(eventReward),
-
-                createdAt: serverTimestamp()
-
-            });
-
-            setMessage("✅ Événement créé");
-
-            setEventTitle("");
-
-            setEventDate("");
-
-            setEventReward("");
-
-        } catch (error) {
-
-            console.error(error);
-
-            setMessage("❌ Erreur technique");
-
-        }
-
-    };
 
 
 
