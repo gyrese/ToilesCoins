@@ -135,63 +135,71 @@ export default function Events() {
                         <div className="row g-5 justify-content-center">
                             {upcomingEvents.map((event) => (
                                 <div key={event.id} className="col-12 col-md-6 col-lg-4 d-flex justify-content-center">
-                                    <div className="card border-0 bg-transparent" style={{ width: "100%", maxWidth: "350px" }}>
-                                        <div className="position-relative">
+                                    <div className="card border-0 bg-transparent" style={{ width: "100%", maxWidth: "350px", height: "500px" }}>
+                                        <div className="position-relative w-100 h-100">
                                             {/* Shadow */}
-                                            <div className="position-absolute w-100 h-100 bg-black rounded-top-5 rounded-bottom-3"
+                                            <div className="position-absolute w-100 h-100 bg-black rounded-4"
                                                 style={{ top: "10px", left: "10px", zIndex: 0 }}></div>
 
                                             {/* Main Card */}
-                                            <div className="position-relative bg-white border border-4 border-dark rounded-top-5 rounded-bottom-3 overflow-hidden d-flex flex-column"
-                                                style={{ zIndex: 1, minHeight: "450px" }}>
+                                            <div className="position-relative w-100 h-100 bg-dark border border-4 border-dark rounded-4 overflow-hidden d-flex flex-column"
+                                                style={{ zIndex: 1 }}>
 
-                                                {/* Image Section */}
-                                                <div className="position-relative border-bottom border-4 border-dark bg-light" style={{ height: "250px" }}>
-                                                    {event.imageUrl || event.coverImage ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img
-                                                            src={event.imageUrl || event.coverImage}
-                                                            alt={event.name || event.title}
-                                                            className="w-100 h-100 object-fit-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-100 h-100 d-flex align-items-center justify-content-center text-secondary display-1">
-                                                            {getEventEmoji(event)}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Status Badge */}
-                                                    <div className="position-absolute top-0 end-0 bg-success text-white px-3 py-1 fw-bold border-bottom border-start border-4 border-dark rounded-bottom-left-3"
-                                                        style={{ borderBottomLeftRadius: "10px" }}>
-                                                        <span className="small">OUVERT</span>
+                                                {/* Image Background */}
+                                                {event.imageUrl || event.coverImage ? (
+                                                    <img
+                                                        src={event.imageUrl || event.coverImage}
+                                                        alt={event.name || event.title}
+                                                        className="position-absolute w-100 h-100 object-fit-cover"
+                                                        style={{ filter: "brightness(0.8)" }}
+                                                    />
+                                                ) : (
+                                                    <div className="position-absolute w-100 h-100 d-flex align-items-center justify-content-center bg-secondary bg-gradient">
+                                                        <div className="display-1">{getEventEmoji(event)}</div>
                                                     </div>
+                                                )}
+
+                                                {/* Gradient Overlay */}
+                                                <div className="position-absolute bottom-0 w-100"
+                                                    style={{
+                                                        height: "70%",
+                                                        background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 40%, transparent 100%)"
+                                                    }}>
                                                 </div>
 
-                                                {/* Content Section */}
-                                                <div className="p-4 d-flex flex-column" style={{ backgroundColor: "#FFD95A" }}>
-                                                    <h3 className="h4 fw-bold text-uppercase mb-2 text-dark" style={{ transform: "rotate(-1deg)" }}>
+                                                {/* Status Badge */}
+                                                <div className="position-absolute top-0 end-0 m-3">
+                                                    <span className="badge bg-success text-white border border-2 border-white px-3 py-2 fw-bold shadow-sm">
+                                                        OUVERT
+                                                    </span>
+                                                </div>
+
+                                                {/* Content Overlay */}
+                                                <div className="position-absolute bottom-0 w-100 p-4 text-white mt-auto">
+                                                    <h3 className="h3 fw-bold text-uppercase mb-2 text-warning" style={{ textShadow: "2px 2px 0px #000" }}>
                                                         {event.name || event.title || "Événement mystère"}
                                                     </h3>
 
                                                     {event.description && (
-                                                        <p className="small fw-bold fst-italic text-dark mb-3" style={{ opacity: 0.8 }}>
+                                                        <p className="small fw-bold text-white-50 mb-3 line-clamp-2" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                                                             {event.description}
                                                         </p>
                                                     )}
 
-                                                    <div className="d-flex align-items-center gap-2 mb-3 text-dark">
-                                                        <Calendar size={16} />
-                                                        <span className="small fw-bold">{formatDate(event.date)}</span>
+                                                    <div className="d-flex align-items-center gap-2 mb-2 text-white">
+                                                        <Calendar size={18} className="text-warning" />
+                                                        <span className="fw-bold">{formatDate(event.date)}</span>
                                                     </div>
 
                                                     {event.place && (
-                                                        <div className="small fw-bold text-dark mb-3">
+                                                        <div className="small fw-bold text-white mb-4">
                                                             📍 {event.place}
                                                         </div>
                                                     )}
 
                                                     <button
-                                                        className="btn btn-dark w-100 fw-bold text-uppercase rounded-3 mt-auto"
+                                                        className="btn btn-warning w-100 fw-bold text-uppercase rounded-3 border-2 border-black py-2 hover-scale"
+                                                        style={{ boxShadow: "4px 4px 0px #000", transition: "all 0.2s" }}
                                                     >
                                                         S'inscrire
                                                     </button>
