@@ -121,6 +121,7 @@ export default function Profile() {
             setProgress(100);
             setTimeout(() => {
                 setGeneratedImage(data.imageUrl);
+                setEditAvatar(data.imageUrl);
                 setIsGenerating(false);
             }, 500);
 
@@ -434,7 +435,7 @@ export default function Profile() {
 
                 <div className="activity-card p-0 mb-5 overflow-hidden">
                     <div className="text-center border-bottom border-dark border-3 py-2">
-                        <h2 className="font-impact mb-0">DERNIERE ACTIVITÉ</h2>
+                        <h2 className="font-impact mb-0">DERNIERE ACTIVITE</h2>
                     </div>
                     {lastEvent ? (
                         <div className="d-flex align-items-center p-3">
@@ -557,7 +558,7 @@ export default function Profile() {
                                             role="progressbar"
                                             style={{ width: '100%', fontSize: '0.9rem', fontWeight: 'bold', color: 'black' }}
                                         >
-                                            🎨 Création de votre avatar magique...
+                                            🎨 Création de votre avatar magique veuillez patienter...
                                         </div>
                                     </div>
                                 </div>
