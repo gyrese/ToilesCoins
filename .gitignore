@@ -17,6 +17,12 @@
 /.next/
 /out/
 
+# test pages and backups
+/app/test-*/
+*_backup.*
+*_new_part*
+.env .local
+
 # production
 /build
 
