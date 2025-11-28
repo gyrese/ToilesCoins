@@ -6,7 +6,7 @@ Le niveau est calculé selon la formule suivante :
 - **1 Victoire** = 500 XP
 - **1 Événement participé** = 100 XP
 - **Niveau** = (XP total / 1000) + 1
-- **Niveau maximum** = 50
+- **Niveau maximum** = 100
 
 ### Formule
 ```javascript
@@ -20,7 +20,7 @@ const finalLevel = Math.min(50, level);
 ### Niveau 1-9 : **Novice**
 - Taille : 2rem
 - Couleur : Noir simple
-- Aucune animation
+- Animation : Légère apparition (fade-in)
 
 ### Niveau 10-19 : **Initié Bronze**
 - Taille : 2.2rem

@@ -973,17 +973,7 @@ export default function Admin() {
 
                     </button>
 
-                    <button
 
-                        onClick={() => { setActiveTab("events"); setMessage(""); }}
-
-                        className={`neo-btn whitespace-nowrap ${activeTab === "events" ? "bg-black text-white" : "bg-white text-black"}`}
-
-                    >
-
-                        Événements
-
-                    </button>
 
                     <button
 
@@ -1029,7 +1019,7 @@ export default function Admin() {
 
                     >
 
-                        🏆 VNEMENTs
+                        🏆 ÉVÉNEMENTS
 
                     </button>
 
@@ -1113,85 +1103,7 @@ export default function Admin() {
 
 
 
-                    {activeTab === "events" && (
 
-                        <div>
-
-                            <h2 className="text-xl font-black uppercase mb-6">Créer un Événement</h2>
-
-                            <form onSubmit={handleCreateEvent} className="space-y-4">
-
-                                <div>
-
-                                    <label className="block font-bold mb-1 uppercase text-sm">Titre</label>
-
-                                    <input
-
-                                        type="text"
-
-                                        className="neo-input"
-
-                                        placeholder="VNEMENT Mario Kart"
-
-                                        value={eventTitle}
-
-                                        onChange={e => setEventTitle(e.target.value)}
-
-                                        required
-
-                                    />
-
-                                </div>
-
-                                <div>
-
-                                    <label className="block font-bold mb-1 uppercase text-sm">Date</label>
-
-                                    <input
-
-                                        type="datetime-local"
-
-                                        className="neo-input"
-
-                                        value={eventDate}
-
-                                        onChange={e => setEventDate(e.target.value)}
-
-                                        required
-
-                                    />
-
-                                </div>
-
-                                <div>
-
-                                    <label className="block font-bold mb-1 uppercase text-sm">Récompense</label>
-
-                                    <input
-
-                                        type="number"
-
-                                        className="neo-input"
-
-                                        placeholder="1000"
-
-                                        value={eventReward}
-
-                                        onChange={e => setEventReward(e.target.value)}
-
-                                        required
-
-                                    />
-
-                                </div>
-
-                                <button type="submit" className="neo-btn w-full">Créer</button>
-
-                            </form>
-
-                        </div>
-
-                    )}
 
 
 
@@ -1705,7 +1617,7 @@ export default function Admin() {
 
                         <div>
 
-                            <h2 className="text-xl font-black uppercase mb-6">🏆 Gestion des VNEMENTs</h2>
+                            <h2 className="text-xl font-black uppercase mb-6">🏆 Gestion des ÉVÉNEMENTS</h2>
 
 
 
@@ -1713,7 +1625,7 @@ export default function Admin() {
 
                             <div className="mb-8 p-6 bg-yellow-100 border-2 border-black">
 
-                                <h3 className="font-black uppercase mb-4">➕ Ajouter un VNEMENT</h3>
+                                <h3 className="font-black uppercase mb-4">➕ Ajouter un ÉVÉNEMENT</h3>
 
                                 <form onSubmit={async (e) => {
 
@@ -1739,11 +1651,11 @@ export default function Admin() {
 
                                         });
 
-                                        setMessage("✅ VNEMENT ajouté !");
+                                        setMessage("✅ ÉVÉNEMENT ajouté !");
 
 
 
-                                        // Recharger les VNEMENTs
+                                        // Recharger les ÉVÉNEMENTS
 
                                         const q = query(collection(db, "events"));
 
@@ -1781,7 +1693,7 @@ export default function Admin() {
 
                                     <div>
 
-                                        <label className="block font-bold mb-1 text-sm">NOM DU VNEMENT *</label>
+                                        <label className="block font-bold mb-1 text-sm">NOM DE L'ÉVÉNEMENT *</label>
 
                                         <input
 
@@ -1793,7 +1705,7 @@ export default function Admin() {
 
                                             className="w-full p-2 border-2 border-black"
 
-                                            placeholder="Ex: VNEMENT Mario Kart Décembre 2024"
+                                            placeholder="Ex: ÉVÉNEMENT Mario Kart Décembre 2024"
 
                                         />
 
@@ -1847,7 +1759,7 @@ export default function Admin() {
 
                                             rows={3}
 
-                                            placeholder="Description du VNEMENT..."
+                                            placeholder="Description de l'événement..."
 
                                         ></textarea>
 
@@ -1855,7 +1767,7 @@ export default function Admin() {
 
                                     <button type="submit" className="neo-btn bg-green-400 hover:bg-green-300 w-full">
 
-                                        ➕ AJOUTER LE VNEMENT
+                                        ➕ AJOUTER L'ÉVÉNEMENT
 
                                     </button>
 
