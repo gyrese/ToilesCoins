@@ -409,8 +409,8 @@ export default function Profile() {
                     <div className="flex-grow-1 d-flex flex-nowrap align-items-center py-3 px-2 gap-3 hide-scrollbar" style={{ overflowX: 'auto' }}>
                         {badges.length > 0 ? (
                             badges.map((badge) => (
-                                <div key={badge.id} className="text-center flex-shrink-0" style={{ width: '80px', cursor: 'pointer' }} onClick={() => setSelectedBadge(badge)}>
-                                    <div className="mb-2" style={{ width: '60px', height: '60px', margin: '0 auto' }}>
+                                <div key={badge.id} className="text-center flex-shrink-0" style={{ width: '120px', cursor: 'pointer' }} onClick={() => setSelectedBadge(badge)}>
+                                    <div className="mb-2" style={{ width: '100px', height: '100px', margin: '0 auto' }}>
                                         <img src={badge.icon} alt={badge.name} className="w-100 h-100 object-fit-contain" onError={(e) => {
                                             (e.target as HTMLImageElement).style.display = 'none';
                                             (e.target as HTMLImageElement).parentElement!.innerText = '🏆';
@@ -425,7 +425,7 @@ export default function Profile() {
                             <div className="text-white opacity-50 text-center w-100 small">Aucun badge disponible</div>
                         )}
                         {badges.length < 4 && (
-                            <div className="text-center opacity-25 flex-shrink-0" style={{ width: '80px' }}>
+                            <div className="text-center opacity-25 flex-shrink-0" style={{ width: '120px' }}>
                                 <div className="h1 mb-0" style={{ fontSize: '2.5rem' }}>🔒</div>
                             </div>
                         )}
