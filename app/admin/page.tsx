@@ -112,12 +112,14 @@ export default function Admin() {
         date: "",
         place: "",
         imageUrl: "",
+        link: "",
         winner: "",
         secondPlace: "",
         winnerPoints: "100",
         secondPlacePoints: "50"
     });
 
+    const [eventSubTab, setEventSubTab] = useState<"types" | "creation" | "history">("history");
     const [showAddEventType, setShowAddEventType] = useState(false);
 
     const [newEventType, setNewEventType] = useState({
@@ -129,6 +131,7 @@ export default function Admin() {
         emoji: ""
 
     });
+    const [editingEventType, setEditingEventType] = useState<any>(null);
 
 
 
@@ -185,6 +188,10 @@ export default function Admin() {
                 });
 
                 setEvents(eventsData);
+
+                const typesSnapshot = await getDocs(collection(db, "eventTypes"));
+                const typesData = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setEventTypes(typesData);
 
             }
 
@@ -726,6 +733,7 @@ export default function Admin() {
             date: event.date ? new Date(event.date.toDate ? event.date.toDate() : event.date).toISOString().slice(0, 16) : "",
             place: event.place || "",
             imageUrl: event.imageUrl || event.coverImage || "",
+            link: event.link || "",
             winner: event.winner || "",
             secondPlace: event.secondPlace || "",
             winnerPoints: event.winnerPoints?.toString() || "100",
@@ -757,6 +765,7 @@ export default function Admin() {
                 date: new Date(eventForm.date).toISOString(),
                 place: eventForm.place,
                 imageUrl: eventForm.imageUrl,
+                link: eventForm.link || null,
                 winner: eventForm.winner,
                 secondPlace: eventForm.secondPlace,
                 winnerPoints: parseInt(eventForm.winnerPoints),
@@ -833,6 +842,7 @@ export default function Admin() {
                 date: "",
                 place: "",
                 imageUrl: "",
+                link: "",
                 winner: "",
                 secondPlace: "",
                 winnerPoints: "100",
@@ -869,6 +879,81 @@ export default function Admin() {
 
         }
 
+    };
+
+
+
+    const handleAddEventType = async (e: React.FormEvent) => {
+
+        e.preventDefault();
+
+        const payload = {
+            name: newEventType.name.trim(),
+            icon: newEventType.icon.trim(),
+            emoji: newEventType.emoji.trim() || "🎮"
+        };
+
+        if (!payload.name) {
+            setMessage("❌ Nom du type requis");
+            return;
+        }
+
+        try {
+            if (editingEventType) {
+                await updateDoc(doc(db, "eventTypes", editingEventType.id), payload);
+                setEventTypes(prev => prev.map((type) => type.id === editingEventType.id ? { ...type, ...payload } : type));
+                setMessage("✅ Type d'événement mis à jour");
+            } else {
+                const docRef = await addDoc(collection(db, "eventTypes"), payload);
+                setEventTypes(prev => [...prev, { id: docRef.id, ...payload }]);
+                setMessage("✅ Type d'événement ajouté");
+            }
+            setNewEventType({ name: "", icon: "", emoji: "" });
+            setEditingEventType(null);
+            setShowAddEventType(false);
+        } catch (error) {
+            console.error(error);
+            setMessage("❌ Erreur lors de l'enregistrement du type");
+        }
+    };
+
+
+
+    const handleDeleteEventType = async (id: string) => {
+
+        if (!confirm("Supprimer ce type d'événement ?")) return;
+
+        try {
+            await deleteDoc(doc(db, "eventTypes", id));
+            setEventTypes(prev => prev.filter((type) => type.id !== id));
+            if (editingEventType?.id === id) {
+                setEditingEventType(null);
+                setNewEventType({ name: "", icon: "", emoji: "" });
+            }
+            setMessage("✅ Type supprimé");
+        } catch (error) {
+            console.error(error);
+            setMessage("❌ Erreur lors de la suppression du type");
+        }
+    };
+
+
+
+    const uploadEventImage = async (file: File) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/admin/upload-image", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error("Impossible de téléverser l'image.");
+        }
+
+        const data = await response.json();
+        return data.url as string;
     };
 
 
@@ -1577,161 +1662,450 @@ export default function Admin() {
 
                             <h2 className="text-xl font-black uppercase mb-6">🏆 Gestion des ÉVÉNEMENTS</h2>
 
-
-
-                            {/* Formulaire d'ajout manuel de VNEMENT */}
-
-                            <div className="mb-8 p-6 bg-yellow-100 border-2 border-black">
-
-                                <h3 className="font-black uppercase mb-4">➕ Ajouter un ÉVÉNEMENT</h3>
-
-                                <form onSubmit={async (e) => {
-
-                                    e.preventDefault();
-
-                                    const formData = new FormData(e.currentTarget);
-
-                                    try {
-
-                                        await addDoc(collection(db, "events"), {
-
-                                            name: formData.get('eventName'),
-
-                                            description: formData.get('eventDesc') || "",
-
-                                            date: new Date(formData.get('eventDate') as string),
-
-                                            place: formData.get('eventPlace') || "",
-
-                                            status: "upcoming",
-
-                                            createdAt: serverTimestamp()
-
-                                        });
-
-                                        setMessage("✅ ÉVÉNEMENT ajouté !");
-
-
-
-                                        // Recharger les ÉVÉNEMENTS
-
-                                        const q = query(collection(db, "events"));
-
-                                        const snapshot = await getDocs(q);
-
-                                        const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                                        eventsData.sort((a: any, b: any) => {
-
-                                            const dateA = a.date?.toDate?.() || new Date(a.date);
-
-                                            const dateB = b.date?.toDate?.() || new Date(b.date);
-
-                                            return dateB - dateA;
-
-                                        });
-
-                                        setEvents(eventsData);
-
-
-
-                                        // Réinitialiser le formulaire
-
-                                        (e.target as HTMLFormElement).reset();
-
-                                    } catch (error: any) {
-
-                                        console.error('Erreur complète:', error);
-
-                                        setMessage(`❌ Erreur: ${error.message || 'Erreur inconnue'}`);
-
-                                    }
-
-                                }} className="space-y-3">
-
-                                    <div>
-
-                                        <label className="block font-bold mb-1 text-sm">NOM DE L'ÉVÉNEMENT *</label>
-
-                                        <input
-
-                                            type="text"
-
-                                            name="eventName"
-
-                                            required
-
-                                            className="w-full p-2 border-2 border-black"
-
-                                            placeholder="Ex: ÉVÉNEMENT Mario Kart Décembre 2024"
-
-                                        />
-
-                                    </div>
-
-                                    <div>
-
-                                        <label className="block font-bold mb-1 text-sm">DATE *</label>
-
-                                        <input
-
-                                            type="datetime-local"
-
-                                            name="eventDate"
-
-                                            required
-
-                                            className="w-full p-2 border-2 border-black"
-
-                                        />
-
-                                    </div>
-
-                                    <div>
-
-                                        <label className="block font-bold mb-1 text-sm">LIEU</label>
-
-                                        <input
-
-                                            type="text"
-
-                                            name="eventPlace"
-
-                                            className="w-full p-2 border-2 border-black"
-
-                                            placeholder="Ex: Bar Le Pixel"
-
-                                        />
-
-                                    </div>
-
-                                    <div>
-
-                                        <label className="block font-bold mb-1 text-sm">DESCRIPTION</label>
-
-                                        <textarea
-
-                                            name="eventDesc"
-
-                                            className="w-full p-2 border-2 border-black"
-
-                                            rows={3}
-
-                                            placeholder="Description de l'événement..."
-
-                                        ></textarea>
-
-                                    </div>
-
-                                    <button type="submit" className="neo-btn bg-green-400 hover:bg-green-300 w-full">
-
-                                        ➕ AJOUTER L'ÉVÉNEMENT
-
-                                    </button>
-
-                                </form>
-
+                            <div className="flex gap-2 mb-6 flex-wrap">
+                                <button
+                                    onClick={() => setEventSubTab("types")}
+                                    className={`neo-btn ${eventSubTab === "types" ? "bg-black text-white" : "bg-white text-black"}`}
+                                >
+                                    🏷️ TYPES
+                                </button>
+                                <button
+                                    onClick={() => setEventSubTab("creation")}
+                                    className={`neo-btn ${eventSubTab === "creation" ? "bg-black text-white" : "bg-white text-black"}`}
+                                >
+                                    ➕ CRÉATION
+                                </button>
+                                <button
+                                    onClick={() => setEventSubTab("history")}
+                                    className={`neo-btn ${eventSubTab === "history" ? "bg-black text-white" : "bg-white text-black"}`}
+                                >
+                                    📜 HISTORIQUE
+                                </button>
                             </div>
+
+
+
+                            {eventSubTab === "types" && (
+                                <div className="mb-8 p-6 bg-white border-2 border-black">
+                                    <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+                                        <h3 className="font-black uppercase">📁 Types d'événements ({eventTypes.length})</h3>
+                                        <button
+                                            onClick={() => setShowAddEventType(!showAddEventType)}
+                                            className="neo-btn bg-yellow-200 hover:bg-yellow-100"
+                                        >
+                                            {showAddEventType ? "Fermer le formulaire" : "➕ Ajouter un type"}
+                                        </button>
+                                    </div>
+
+                                    {showAddEventType && (
+                                        <form onSubmit={handleAddEventType} className="grid gap-3 mb-6 md:grid-cols-3">
+                                            {editingEventType && (
+                                                <div className="md:col-span-3 flex items-center justify-between bg-yellow-50 border-2 border-black px-3 py-2">
+                                                    <span className="font-bold text-sm uppercase">✏️ Édition du type: {editingEventType.name}</span>
+                                                    <button
+                                                        type="button"
+                                                        className="neo-btn bg-gray-200 text-xs"
+                                                        onClick={() => {
+                                                            setEditingEventType(null);
+                                                            setNewEventType({ name: "", icon: "", emoji: "" });
+                                                        }}
+                                                    >
+                                                        Annuler
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div className="flex flex-col">
+                                                <label className="font-bold text-xs uppercase mb-1">Nom *</label>
+                                                <input
+                                                    type="text"
+                                                    className="neo-input"
+                                                    value={newEventType.name}
+                                                    onChange={(e) => setNewEventType({ ...newEventType, name: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <label className="font-bold text-xs uppercase mb-1">Emoji</label>
+                                                <input
+                                                    type="text"
+                                                    className="neo-input"
+                                                    value={newEventType.emoji}
+                                                    onChange={(e) => setNewEventType({ ...newEventType, emoji: e.target.value })}
+                                                    placeholder="🎮"
+                                                    maxLength={4}
+                                                />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <label className="font-bold text-xs uppercase mb-1">Icône (URL)</label>
+                                                <input
+                                                    type="text"
+                                                    className="neo-input"
+                                                    value={newEventType.icon}
+                                                    onChange={(e) => setNewEventType({ ...newEventType, icon: e.target.value })}
+                                                    placeholder="https://..."
+                                                />
+                                            </div>
+                                            <div className="md:col-span-3 grid md:grid-cols-2 gap-2">
+                                                <button type="submit" className="neo-btn w-full bg-green-400 hover:bg-green-300">
+                                                    {editingEventType ? "Mettre à jour le type" : "Enregistrer le type"}
+                                                </button>
+                                                {editingEventType && (
+                                                    <button
+                                                        type="button"
+                                                        className="neo-btn w-full bg-gray-200"
+                                                        onClick={() => {
+                                                            setEditingEventType(null);
+                                                            setNewEventType({ name: "", icon: "", emoji: "" });
+                                                            setShowAddEventType(false);
+                                                        }}
+                                                    >
+                                                        Fermer
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </form>
+                                    )}
+
+                                    {eventTypes.length === 0 ? (
+                                        <div className="p-6 text-center bg-gray-50 border-2 border-dashed border-black">
+                                            Aucun type pour l'instant. Ajoutez-en un !
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            {eventTypes.map((type: any) => (
+                                                <div key={type.id} className="flex items-center gap-4 p-4 border-2 border-black bg-gray-50">
+                                                    <div className="w-16 h-16 border-2 border-black flex items-center justify-center bg-white">
+                                                        {type.icon ? (
+                                                            <img
+                                                                src={type.icon}
+                                                                alt={type.name}
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+                                                            />
+                                                        ) : (
+                                                            <span className="text-3xl">{type.emoji || "🎮"}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="font-black uppercase">{type.name}</div>
+                                                        {type.emoji && <div className="text-2xl">{type.emoji}</div>}
+                                                    </div>
+                                                    <div className="flex flex-col gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingEventType(type);
+                                                                setNewEventType({
+                                                                    name: type.name || "",
+                                                                    icon: type.icon || "",
+                                                                    emoji: type.emoji || ""
+                                                                });
+                                                                setShowAddEventType(true);
+                                                            }}
+                                                            className="neo-btn bg-blue-200 hover:bg-blue-100"
+                                                        >
+                                                            EDIT
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteEventType(type.id)}
+                                                            className="neo-btn bg-red-200 hover:bg-red-100"
+                                                        >
+                                                            SUPP
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {eventSubTab === "creation" && (
+                                <>
+                                    {/* Formulaire d'ajout manuel de VNEMENT */}
+
+                                    <div className="mb-8 p-6 bg-yellow-100 border-2 border-black">
+
+                                        <h3 className="font-black uppercase mb-4">➕ Ajouter un ÉVÉNEMENT</h3>
+
+                                        <form onSubmit={async (e) => {
+
+                                            e.preventDefault();
+
+                                            const formData = new FormData(e.currentTarget);
+
+                                            try {
+
+                                                const typeId = formData.get('eventTypeId') as string;
+
+                                                const selectedType = eventTypes.find((type: any) => type.id === typeId);
+
+                                                const imageUrlInput = ((formData.get('eventImageUrl') as string) || "").trim();
+                                                const eventLinkInput = ((formData.get('eventLink') as string) || "").trim();
+
+                                                const imageFile = formData.get('eventImageFile') as File | null;
+
+                                                let finalImageUrl = imageUrlInput;
+
+                                                if (imageFile && imageFile.size > 0) {
+
+                                                    finalImageUrl = await uploadEventImage(imageFile);
+
+                                                }
+
+                                                await addDoc(collection(db, "events"), {
+
+                                                    name: formData.get('eventName'),
+
+                                                    description: formData.get('eventDesc') || "",
+
+                                                    date: new Date(formData.get('eventDate') as string),
+
+                                                    place: formData.get('eventPlace') || "",
+
+                                                    typeId: selectedType?.id || null,
+
+                                                    typeName: selectedType?.name || null,
+
+                                                    typeEmoji: selectedType?.emoji || null,
+
+                                                    typeIcon: selectedType?.icon || null,
+
+                                                    imageUrl: finalImageUrl || null,
+                                                    link: eventLinkInput || null,
+
+                                                    status: "upcoming",
+
+                                                    createdAt: serverTimestamp()
+
+                                                });
+
+                                                setMessage("✅ ÉVÉNEMENT ajouté !");
+
+
+
+                                                // Recharger les ÉVÉNEMENTS
+
+                                                const q = query(collection(db, "events"));
+
+                                                const snapshot = await getDocs(q);
+
+                                                const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                                                eventsData.sort((a: any, b: any) => {
+
+                                                    const dateA = a.date?.toDate?.() || new Date(a.date);
+
+                                                    const dateB = b.date?.toDate?.() || new Date(b.date);
+
+                                                    return dateB - dateA;
+
+                                                });
+
+                                                setEvents(eventsData);
+
+
+
+                                                // Réinitialiser le formulaire
+
+                                                (e.target as HTMLFormElement).reset();
+
+                                            } catch (error: any) {
+
+                                                console.error('Erreur complète:', error);
+
+                                                setMessage(`❌ Erreur: ${error.message || 'Erreur inconnue'}`);
+
+                                            }
+
+                                        }} className="space-y-3">
+
+                                            <div>
+
+                                                <label className="block font-bold mb-1 text-sm">TYPE D'ÉVÉNEMENT *</label>
+
+                                                {eventTypes.length === 0 ? (
+
+                                                    <div className="p-3 bg-white border-2 border-black text-sm">
+
+                                                        Aucun type disponible. Ajoutez-en dans l'onglet Types.
+
+                                                    </div>
+
+                                                ) : (
+
+                                                    <select
+
+                                                        name="eventTypeId"
+
+                                                        required
+
+                                                        className="w-full p-2 border-2 border-black text-sm uppercase"
+
+                                                        defaultValue={eventTypes[0]?.id}
+
+                                                    >
+
+                                                        {eventTypes.map((type: any) => (
+
+                                                            <option key={type.id} value={type.id}>
+
+                                                                {type.emoji || "🎮"} {type.name}
+
+                                                            </option>
+
+                                                        ))}
+
+                                                    </select>
+
+                                                )}
+
+                                            </div>
+
+                                            <div>
+
+                                                <label className="block font-bold mb-1 text-sm">NOM DE L'ÉVÉNEMENT *</label>
+
+                                                <input
+
+                                                    type="text"
+
+                                                    name="eventName"
+
+                                                    required
+
+                                                    className="w-full p-2 border-2 border-black"
+
+                                                    placeholder="Ex: ÉVÉNEMENT Mario Kart Décembre 2024"
+
+                                                />
+
+                                            </div>
+
+                                            <div>
+
+                                                <label className="block font-bold mb-1 text-sm">DATE *</label>
+
+                                                <input
+
+                                                    type="datetime-local"
+
+                                                    name="eventDate"
+
+                                                    required
+
+                                                    className="w-full p-2 border-2 border-black"
+
+                                                />
+
+                                            </div>
+
+                                            <div>
+
+                                                <label className="block font-bold mb-1 text-sm">LIEU</label>
+
+                                                <input
+
+                                                    type="text"
+
+                                                    name="eventPlace"
+
+                                                    className="w-full p-2 border-2 border-black"
+
+                                                    placeholder="Ex: Bar Le Pixel"
+
+                                                />
+
+                                            </div>
+
+                                            <div>
+
+                                                <label className="block font-bold mb-1 text-sm">Lien de l'événement</label>
+
+                                                <input
+
+                                                    type="url"
+
+                                                    name="eventLink"
+
+                                                    className="w-full p-2 border-2 border-black"
+
+                                                    placeholder="https://www.facebook.com/..."
+
+                                                />
+
+                                            </div>
+
+                                            <div>
+
+                                                <label className="block font-bold mb-1 text-sm">DESCRIPTION</label>
+
+                                                <textarea
+
+                                                    name="eventDesc"
+
+                                                    className="w-full p-2 border-2 border-black"
+
+                                                    rows={3}
+
+                                                    placeholder="Description de l'événement..."
+
+                                                ></textarea>
+
+                                            </div>
+
+                                            <div className="grid md:grid-cols-2 gap-3">
+
+                                                <div>
+
+                                                    <label className="block font-bold mb-1 text-sm">IMAGE (URL)</label>
+
+                                                    <input
+
+                                                        type="url"
+
+                                                        name="eventImageUrl"
+
+                                                        className="w-full p-2 border-2 border-black"
+
+                                                        placeholder="https://exemple.com/image.jpg"
+
+                                                    />
+
+                                                </div>
+
+                                                <div>
+
+                                                    <label className="block font-bold mb-1 text-sm">OU IMPORTER UN FICHIER</label>
+
+                                                    <input
+
+                                                        type="file"
+
+                                                        name="eventImageFile"
+
+                                                        accept="image/*"
+
+                                                        className="w-full p-2 border-2 border-dashed border-black bg-white"
+
+                                                    />
+
+                                                    <p className="text-xs mt-1 italic">Le fichier sera intégré directement dans l'événement.</p>
+
+                                                </div>
+
+                                            </div>
+
+                                            <button type="submit" className="neo-btn bg-green-400 hover:bg-green-300 w-full">
+
+                                                ➕ AJOUTER L'ÉVÉNEMENT
+
+                                            </button>
+
+                                        </form>
+
+                                    </div>
+                                </>
+                            )}
 
 
 
@@ -1789,6 +2163,16 @@ export default function Admin() {
                                                             value={eventForm.imageUrl}
                                                             onChange={(e) => setEventForm({ ...eventForm, imageUrl: e.target.value })}
                                                             className="w-full p-1 border border-black text-sm"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block font-bold text-xs uppercase">Lien de l'événement</label>
+                                                        <input
+                                                            type="url"
+                                                            value={eventForm.link}
+                                                            onChange={(e) => setEventForm({ ...eventForm, link: e.target.value })}
+                                                            className="w-full p-1 border border-black text-sm"
+                                                            placeholder="https://www.facebook.com/..."
                                                         />
                                                     </div>
                                                     <div>
@@ -1875,108 +2259,121 @@ export default function Admin() {
 
 
 
-                            {/* Liste des VNEMENTs */}
+                            {eventSubTab === "history" && (
+                                <div>
 
-                            <div>
+                                    <h3 className="font-black uppercase mb-4">📋 HISTORIQUE DES ÉVÉNEMENTS</h3>
 
-                                <h3 className="font-black uppercase mb-4">📋 HISTORIQUE DES ÉVÉNEMENTS</h3>
+                                    {events.length === 0 ? (
 
-                                {events.length === 0 ? (
+                                        <div className="text-center p-8 bg-gray-100 border-2 border-black">
 
-                                    <div className="text-center p-8 bg-gray-100 border-2 border-black">
+                                            <p className="font-bold">Aucun ÉVÉNEMENT enregistré</p>
 
-                                        <p className="font-bold">Aucun ÉVÉNEMENT enregistré</p>
+                                            <p className="text-sm mt-2">Ajoutez votre premier ÉVÉNEMENT ci-dessus !</p>
 
-                                        <p className="text-sm mt-2">Ajoutez votre premier ÉVÉNEMENT ci-dessus !</p>
+                                        </div>
 
-                                    </div>
+                                    ) : (
 
-                                ) : (
+                                        <div className="space-y-4">
 
-                                    <div className="space-y-4">
+                                            {events.map((event: any) => (
 
-                                        {events.map((event: any) => (
+                                                <div key={event.id} className="p-4 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
 
-                                            <div key={event.id} className="p-4 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                                                    {(event.imageUrl || event.coverImage) && (
+                                                        <div className="mb-3 border-2 border-black overflow-hidden rounded-sm max-h-48">
+                                                            <img
+                                                                src={event.imageUrl || event.coverImage}
+                                                                alt={event.name || "Illustration de l'événement"}
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
 
-                                                <div className="flex items-start justify-between">
+                                                    <div className="flex items-start justify-between">
 
-                                                    <div className="flex-1">
+                                                        <div className="flex-1">
 
-                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <div className="flex items-center gap-2 mb-2">
 
-                                                            <h4 className="font-black text-lg">{event.name}</h4>
+                                                                <h4 className="font-black text-lg">{event.name}</h4>
 
-                                                            <span className={`px-2 py-1 text-xs font-bold border-2 border-black ${event.status === 'completed' ? 'bg-green-200' : 'bg-yellow-200'
+                                                                <span className={`px-2 py-1 text-xs font-bold border-2 border-black ${event.status === 'completed' ? 'bg-green-200' : 'bg-yellow-200'
 
-                                                                }`}>
+                                                                    }`}>
 
-                                                                {event.status === 'completed' ? '✅ TERMINÉ' : '⏳ À VENIR'}
+                                                                    {event.status === 'completed' ? '✅ TERMINÉ' : '⏳ À VENIR'}
 
-                                                            </span>
+                                                                </span>
+
+                                                            </div>
+
+                                                            <div className="text-sm space-y-1">
+
+                                                                <p><strong>📅 Date:</strong> {event.date?.toDate?.()?.toLocaleDateString('fr-FR') || new Date(event.date).toLocaleDateString('fr-FR')}</p>
+
+                                                                {event.place && <p><strong>📍 Lieu:</strong> {event.place}</p>}
+
+                                                                {event.winner && (
+
+                                                                    <div className="mt-2 p-2 bg-yellow-100 border-2 border-yellow-600">
+
+                                                                        <p><strong>🥇 Gagnant:</strong> {event.winner} (+{event.winnerPoints} TC)</p>
+
+                                                                        {event.secondPlace && (
+
+                                                                            <p><strong>🥈 2ème:</strong> {event.secondPlace} (+{event.secondPlacePoints} TC)</p>
+
+                                                                        )}
+
+                                                                    </div>
+
+                                                                )}
+
+                                                            </div>
 
                                                         </div>
 
-                                                        <div className="text-sm space-y-1">
+                                                        <div className="flex gap-2 ml-4">
 
-                                                            <p><strong>📅 Date:</strong> {event.date?.toDate?.()?.toLocaleDateString('fr-FR') || new Date(event.date).toLocaleDateString('fr-FR')}</p>
+                                                            <button
+                                                                onClick={() => startEditEvent(event)}
+                                                                className="px-3 py-1 bg-green-400 border-2 border-black font-bold text-sm hover:bg-green-300"
+                                                            >
+                                                                ✏️ MODIFIER
+                                                            </button>
 
-                                                            {event.place && <p><strong>📍 Lieu:</strong> {event.place}</p>}
+                                                            <button
 
-                                                            {event.winner && (
+                                                                onClick={() => deleteEvent(event.id)}
 
-                                                                <div className="mt-2 p-2 bg-yellow-100 border-2 border-yellow-600">
+                                                                className="px-3 py-1 bg-red-400 border-2 border-black font-bold text-sm hover:bg-red-300"
 
-                                                                    <p><strong>🥇 Gagnant:</strong> {event.winner} (+{event.winnerPoints} TC)</p>
+                                                            >
 
-                                                                    {event.secondPlace && (
+                                                                SUPP
 
-                                                                        <p><strong>🥈 2ème:</strong> {event.secondPlace} (+{event.secondPlacePoints} TC)</p>
-
-                                                                    )}
-
-                                                                </div>
-
-                                                            )}
+                                                            </button>
 
                                                         </div>
-
-                                                    </div>
-
-                                                    <div className="flex gap-2 ml-4">
-
-                                                        <button
-                                                            onClick={() => startEditEvent(event)}
-                                                            className="px-3 py-1 bg-green-400 border-2 border-black font-bold text-sm hover:bg-green-300"
-                                                        >
-                                                            ✏️ MODIFIER
-                                                        </button>
-
-                                                        <button
-
-                                                            onClick={() => deleteEvent(event.id)}
-
-                                                            className="px-3 py-1 bg-red-400 border-2 border-black font-bold text-sm hover:bg-red-300"
-
-                                                        >
-
-                                                            SUPP
-
-                                                        </button>
 
                                                     </div>
 
                                                 </div>
 
-                                            </div>
+                                            ))}
 
-                                        ))}
+                                        </div>
 
-                                    </div>
+                                    )}
 
-                                )}
-
-                            </div>
+                                </div>
+                            )}
 
                         </div>
 

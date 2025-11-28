@@ -18,6 +18,7 @@ interface Event {
     imageUrl?: string;
     coverImage?: string;
     place?: string;
+    link?: string;
     eventType?: {
         name: string;
         emoji: string;
@@ -85,16 +86,18 @@ export default function Events() {
         return "🎮";
     };
 
-    const formatDate = (dateValue: any) => {
-        if (!dateValue) return "Date à confirmer";
-
-        let date: Date;
+    const resolveDate = (dateValue: any) => {
+        if (!dateValue) return null;
         if (dateValue.toDate && typeof dateValue.toDate === 'function') {
-            date = dateValue.toDate();
-        } else if (typeof dateValue === 'string') {
-            date = new Date(dateValue);
-        } else {
-            date = new Date(dateValue);
+            return dateValue.toDate();
+        }
+        return new Date(dateValue);
+    };
+
+    const formatDate = (dateValue: any) => {
+        const date = resolveDate(dateValue);
+        if (!date || isNaN(date.getTime())) {
+            return "Date à confirmer";
         }
 
         return date.toLocaleDateString('fr-FR', {
@@ -107,8 +110,18 @@ export default function Events() {
         });
     };
 
-    const upcomingEvents = events.filter(e => e.status === "upcoming" || !e.winner);
-    const pastEvents = events.filter(e => e.status === "completed" || e.winner);
+    const now = new Date();
+    const isPastEvent = (event: Event) => {
+        if (event.status === "completed" || event.winner) return true;
+
+        const date = resolveDate(event.date);
+        if (!date || isNaN(date.getTime())) return false;
+
+        return date.getTime() < now.getTime();
+    };
+
+    const pastEvents = events.filter(isPastEvent);
+    const upcomingEvents = events.filter(event => !isPastEvent(event));
 
     return (
         <>
@@ -197,12 +210,25 @@ export default function Events() {
                                                         </div>
                                                     )}
 
-                                                    <button
-                                                        className="btn btn-warning w-100 fw-bold text-uppercase rounded-3 border-2 border-black py-2 hover-scale"
-                                                        style={{ boxShadow: "4px 4px 0px #000", transition: "all 0.2s" }}
-                                                    >
-                                                        S'inscrire
-                                                    </button>
+                                                    {event.link ? (
+                                                        <a
+                                                            href={event.link}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="btn btn-warning w-100 fw-bold text-uppercase rounded-3 border-2 border-black py-2 hover-scale text-decoration-none text-dark"
+                                                            style={{ boxShadow: "4px 4px 0px #000", transition: "all 0.2s" }}
+                                                        >
+                                                            S'inscrire
+                                                        </a>
+                                                    ) : (
+                                                        <button
+                                                            className="btn btn-secondary w-100 fw-bold text-uppercase rounded-3 border-2 border-black py-2"
+                                                            style={{ boxShadow: "4px 4px 0px #000", opacity: 0.7 }}
+                                                            disabled
+                                                        >
+                                                            Lien bientôt dispo
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
