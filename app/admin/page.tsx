@@ -113,15 +113,15 @@ export default function Admin() {
     const [editingEvent, setEditingEvent] = useState<any>(null);
 
     const [eventForm, setEventForm] = useState({
-
+        name: "",
+        description: "",
+        date: "",
+        place: "",
+        imageUrl: "",
         winner: "",
-
         secondPlace: "",
-
         winnerPoints: "100",
-
         secondPlacePoints: "50"
-
     });
 
     const [showAddEventType, setShowAddEventType] = useState(false);
@@ -761,21 +761,18 @@ export default function Admin() {
 
 
     const startEditEvent = (event: any) => {
-
         setEditingEvent(event);
-
         setEventForm({
-
+            name: event.name || "",
+            description: event.description || "",
+            date: event.date ? new Date(event.date.toDate ? event.date.toDate() : event.date).toISOString().slice(0, 16) : "",
+            place: event.place || "",
+            imageUrl: event.imageUrl || event.coverImage || "",
             winner: event.winner || "",
-
             secondPlace: event.secondPlace || "",
-
             winnerPoints: event.winnerPoints?.toString() || "100",
-
             secondPlacePoints: event.secondPlacePoints?.toString() || "50"
-
         });
-
     };
 
 
@@ -797,19 +794,17 @@ export default function Admin() {
             const eventRef = doc(db, "events", editingEvent.id);
 
             await updateDoc(eventRef, {
-
+                name: eventForm.name,
+                description: eventForm.description,
+                date: new Date(eventForm.date).toISOString(),
+                place: eventForm.place,
+                imageUrl: eventForm.imageUrl,
                 winner: eventForm.winner,
-
                 secondPlace: eventForm.secondPlace,
-
                 winnerPoints: parseInt(eventForm.winnerPoints),
-
                 secondPlacePoints: parseInt(eventForm.secondPlacePoints),
-
-                status: "completed",
-
-                completedAt: serverTimestamp()
-
+                status: eventForm.winner ? "completed" : "upcoming",
+                completedAt: eventForm.winner ? serverTimestamp() : null
             });
 
 
@@ -872,11 +867,19 @@ export default function Admin() {
 
 
 
-            setMessage(`✅ Résultats enregistrés ! ${eventForm.winner} remporte l'ÉVÉNEMENT !`);
-
+            setMessage(`✅ Événement mis à jour !`);
             setEditingEvent(null);
-
-            setEventForm({ winner: "", secondPlace: "", winnerPoints: "100", secondPlacePoints: "50" });
+            setEventForm({
+                name: "",
+                description: "",
+                date: "",
+                place: "",
+                imageUrl: "",
+                winner: "",
+                secondPlace: "",
+                winnerPoints: "100",
+                secondPlacePoints: "50"
+            });
 
 
 
@@ -1870,87 +1873,116 @@ export default function Admin() {
 
                                     <div className="bg-white border-4 border-black p-6 max-w-md w-full">
 
-                                        <h3 className="font-black text-xl mb-4">🏆 RÉSULTATS DU VNEMENT</h3>
+                                        <h3 className="font-black text-xl mb-4">✏️ MODIFIER L'ÉVÉNEMENT</h3>
 
                                         <p className="font-bold mb-4">{editingEvent.name}</p>
 
-                                        <form onSubmit={saveEventResults} className="space-y-4">
+                                        <form onSubmit={saveEventResults} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
 
-                                            <div>
-
-                                                <label className="block font-bold mb-1 text-sm">🥇 GAGNANT (Pseudo)</label>
-
-                                                <input
-
-                                                    type="text"
-
-                                                    value={eventForm.winner}
-
-                                                    onChange={(e) => setEventForm({ ...eventForm, winner: e.target.value })}
-
-                                                    className="w-full p-2 border-2 border-black"
-
-                                                    placeholder="Pseudo du gagnant"
-
-                                                />
-
+                                            {/* SECTION DETAILS */}
+                                            <div className="bg-gray-100 p-3 border-2 border-black mb-4">
+                                                <h4 className="font-bold border-b-2 border-black mb-2">📝 DÉTAILS</h4>
+                                                <div className="space-y-2">
+                                                    <div>
+                                                        <label className="block font-bold text-xs uppercase">Nom</label>
+                                                        <input
+                                                            type="text"
+                                                            value={eventForm.name}
+                                                            onChange={(e) => setEventForm({ ...eventForm, name: e.target.value })}
+                                                            className="w-full p-1 border border-black text-sm"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block font-bold text-xs uppercase">Date</label>
+                                                        <input
+                                                            type="datetime-local"
+                                                            value={eventForm.date}
+                                                            onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })}
+                                                            className="w-full p-1 border border-black text-sm"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block font-bold text-xs uppercase">Lieu</label>
+                                                        <input
+                                                            type="text"
+                                                            value={eventForm.place}
+                                                            onChange={(e) => setEventForm({ ...eventForm, place: e.target.value })}
+                                                            className="w-full p-1 border border-black text-sm"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block font-bold text-xs uppercase">Image URL</label>
+                                                        <input
+                                                            type="text"
+                                                            value={eventForm.imageUrl}
+                                                            onChange={(e) => setEventForm({ ...eventForm, imageUrl: e.target.value })}
+                                                            className="w-full p-1 border border-black text-sm"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block font-bold text-xs uppercase">Description</label>
+                                                        <textarea
+                                                            value={eventForm.description}
+                                                            onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
+                                                            className="w-full p-1 border border-black text-sm"
+                                                            rows={2}
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            <div>
-
-                                                <label className="block font-bold mb-1 text-sm">💰 POINTS GAGNANT</label>
-
-                                                <input
-
-                                                    type="number"
-
-                                                    value={eventForm.winnerPoints}
-
-                                                    onChange={(e) => setEventForm({ ...eventForm, winnerPoints: e.target.value })}
-
-                                                    className="w-full p-2 border-2 border-black"
-
-                                                />
-
+                                            {/* SECTION RESULTATS */}
+                                            <div className="bg-yellow-50 p-3 border-2 border-black">
+                                                <h4 className="font-bold border-b-2 border-black mb-2">🏆 RÉSULTATS (Optionnel)</h4>
+                                                <div className="space-y-2">
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="block font-bold text-xs uppercase">🥇 Gagnant</label>
+                                                            <input
+                                                                type="text"
+                                                                value={eventForm.winner}
+                                                                onChange={(e) => setEventForm({ ...eventForm, winner: e.target.value })}
+                                                                className="w-full p-1 border border-black text-sm"
+                                                                placeholder="Pseudo"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block font-bold text-xs uppercase">Points</label>
+                                                            <input
+                                                                type="number"
+                                                                value={eventForm.winnerPoints}
+                                                                onChange={(e) => setEventForm({ ...eventForm, winnerPoints: e.target.value })}
+                                                                className="w-full p-1 border border-black text-sm"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="block font-bold text-xs uppercase">🥈 2ème</label>
+                                                            <input
+                                                                type="text"
+                                                                value={eventForm.secondPlace}
+                                                                onChange={(e) => setEventForm({ ...eventForm, secondPlace: e.target.value })}
+                                                                className="w-full p-1 border border-black text-sm"
+                                                                placeholder="Pseudo"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block font-bold text-xs uppercase">Points</label>
+                                                            <input
+                                                                type="number"
+                                                                value={eventForm.secondPlacePoints}
+                                                                onChange={(e) => setEventForm({ ...eventForm, secondPlacePoints: e.target.value })}
+                                                                className="w-full p-1 border border-black text-sm"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            <div>
-
-                                                <label className="block font-bold mb-1 text-sm">🥈 2ÈME PLACE (Pseudo)</label>
-
-                                                <input
-
-                                                    type="text"
-
-                                                    value={eventForm.secondPlace}
-
-                                                    onChange={(e) => setEventForm({ ...eventForm, secondPlace: e.target.value })}
-
-                                                    className="w-full p-2 border-2 border-black"
-
-                                                    placeholder="Pseudo du 2ème"
-
-                                                />
-
-                                            </div>
-
-                                            <div>
-
-                                                <label className="block font-bold mb-1 text-sm">💰 POINTS 2ÈME</label>
-
-                                                <input
-
-                                                    type="number"
-
-                                                    value={eventForm.secondPlacePoints}
-
-                                                    onChange={(e) => setEventForm({ ...eventForm, secondPlacePoints: e.target.value })}
-
-                                                    className="w-full p-2 border-2 border-black"
-
-                                                />
-                                            </div>
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2 pt-2">
                                                 <button type="submit" className="neo-btn bg-green-400 hover:bg-green-300 flex-1">
                                                     ✅ ENREGISTRER
                                                 </button>
@@ -2043,21 +2075,12 @@ export default function Admin() {
 
                                                     <div className="flex gap-2 ml-4">
 
-                                                        {event.status !== 'completed' && (
-
-                                                            <button
-
-                                                                onClick={() => startEditEvent(event)}
-
-                                                                className="px-3 py-1 bg-green-400 border-2 border-black font-bold text-sm hover:bg-green-300"
-
-                                                            >
-
-                                                                🏆 RÉSULTATS
-
-                                                            </button>
-
-                                                        )}
+                                                        <button
+                                                            onClick={() => startEditEvent(event)}
+                                                            className="px-3 py-1 bg-green-400 border-2 border-black font-bold text-sm hover:bg-green-300"
+                                                        >
+                                                            ✏️ MODIFIER
+                                                        </button>
 
                                                         <button
 
