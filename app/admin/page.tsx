@@ -800,6 +800,48 @@ export default function Admin() {
 
                     });
 
+                    // --- LOGIQUE BADGE PREMIÈRE VICTOIRE PAR TYPE ---
+                    if (editingEvent.typeId && editingEvent.typeName) {
+                        try {
+                            // 1. Vérifier le nombre de victoires pour ce type
+                            const qWins = query(
+                                collection(db, "events"),
+                                where("winner", "==", eventForm.winner),
+                                where("typeId", "==", editingEvent.typeId)
+                            );
+                            const snapshotWins = await getDocs(qWins);
+                            const winCount = snapshotWins.size; // Devrait être au moins 1 (celle-ci)
+
+                            // Si c'est la toute première victoire (ou qu'on veut rétroactivement l'appliquer si < 2 pour éviter les doublons si ré-exécuté)
+                            if (winCount === 1) {
+                                const badgeName = `🏆 Expert ${editingEvent.typeName}`;
+                                const badgeDescription = `Première victoire dans un événement ${editingEvent.typeName}`;
+
+                                // 2. Vérifier si le badge existe déjà dans la collection "badges" (optionnel, mais propre)
+                                // On peut aussi juste l'ajouter directement au user.
+                                // Ici on va l'ajouter directement à la sous-collection "badges" du user pour faire simple et efficace.
+
+                                const userBadgesRef = collection(db, "users", winnerDoc.id, "badges");
+                                const qUserBadge = query(userBadgesRef, where("name", "==", badgeName));
+                                const snapshotUserBadge = await getDocs(qUserBadge);
+
+                                if (snapshotUserBadge.empty) {
+                                    await addDoc(userBadgesRef, {
+                                        name: badgeName,
+                                        description: badgeDescription,
+                                        icon: editingEvent.typeEmoji || "🏆", // Utiliser l'emoji du type ou une coupe par défaut
+                                        rarity: "rare",
+                                        obtainedAt: serverTimestamp()
+                                    });
+                                    setMessage(prev => prev + ` + Badge "${badgeName}" attribué !`);
+                                }
+                            }
+                        } catch (err) {
+                            console.error("Erreur attribution badge type:", err);
+                        }
+                    }
+                    // ------------------------------------------------
+
                 }
 
             }
@@ -834,7 +876,7 @@ export default function Admin() {
 
 
 
-            setMessage(`✅ Événement mis à jour !`);
+            setMessage(prev => prev ? prev + " ✅ Événement mis à jour !" : "✅ Événement mis à jour !");
             setEditingEvent(null);
             setEventForm({
                 name: "",
