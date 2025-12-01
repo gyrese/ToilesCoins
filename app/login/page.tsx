@@ -54,11 +54,11 @@ export default function Login() {
     return (
         <main className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 bg-[#FFC845]">
 
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-sm">
                 {/* Logo / Brand */}
                 <div className="text-center mb-8">
                     <h1 className="text-5xl font-black uppercase italic tracking-tighter mb-2">ToilesCoins</h1>
-                    <p className="font-bold text-lg border-2 border-black inline-block px-2 bg-white transform -rotate-2">La Monnaie de la Culture</p>
+                    <p className="font-bold text-lg border-2 border-black inline-block px-2 bg-white transform -rotate-2">La monnaie des Toiles</p>
                 </div>
 
                 {/* Card */}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { collection, query, getDocs, doc, updateDoc, orderBy, limit, where } from "firebase/firestore";
+import { collection, query, getDocs, doc, updateDoc, orderBy, limit, where, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import Navbar from "../components/Navbar";
@@ -69,15 +69,62 @@ export default function Profile() {
             if (!user || !userData) return;
 
             try {
-                // 1. Badges
-                const badgesSnap = await getDocs(collection(db, "badges"));
-                setBadges(badgesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                // 1. Récupérer les badges de l'utilisateur
+                const userBadgesSnap = await getDocs(collection(db, "users", user.uid, "badges"));
+                setBadges(userBadgesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-                // 2. Leaderboard
+                // NOTE: L'attribution automatique des badges a été désactivée
+                // Les badges sont maintenant attribués uniquement via :
+                // 1. Les événements (dans app/admin/page.tsx - saveEventResults)
+                // 2. Un script manuel de mise à jour si nécessaire
+
+                // Ancienne logique d'attribution automatique (désactivée) :
+                /*
+                const allBadgesSnap = await getDocs(collection(db, "badges"));
+                const allBadges = allBadgesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                
+                for (const badge of allBadges) {
+                    if (badge.conditionType === "first_victory_type") continue;
+                    
+                    const userBadgeQuery = query(
+                        collection(db, "users", user.uid, "badges"),
+                        where("name", "==", badge.name)
+                    );
+                    const existingBadgeSnap = await getDocs(userBadgeQuery);
+                    if (!existingBadgeSnap.empty) continue;
+                    
+                    let conditionMet = false;
+                    const conditionValue = parseInt(badge.conditionValue);
+                    
+                    switch (badge.conditionType) {
+                        case "wins":
+                            conditionMet = (userData.wins || 0) >= conditionValue;
+                            break;
+                        case "balance":
+                            conditionMet = (userData.balance || 0) >= conditionValue;
+                            break;
+                        case "events":
+                            conditionMet = (userData.eventsCount || 0) >= conditionValue;
+                            break;
+                    }
+                    
+                    if (conditionMet) {
+                        await addDoc(collection(db, "users", user.uid, "badges"), {
+                            name: badge.name,
+                            description: badge.description,
+                            icon: badge.icon,
+                            rarity: "rare",
+                            obtainedAt: serverTimestamp()
+                        });
+                    }
+                }
+                */
+
+                // 5. Leaderboard
                 const usersSnap = await getDocs(query(collection(db, "users"), orderBy("wins", "desc"), limit(10)));
                 setLeaderboard(usersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-                // 3. Last Event (Participation or Win)
+                // 6. Last Event (Participation or Win)
                 const eventsSnap = await getDocs(query(collection(db, "events"), orderBy("date", "desc"), limit(20)));
                 const events = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
                 const myLastEvent = events.find((e: any) => e.winner === userData.pseudo || e.secondPlace === userData.pseudo);

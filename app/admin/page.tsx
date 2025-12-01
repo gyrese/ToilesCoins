@@ -774,82 +774,71 @@ export default function Admin() {
                 completedAt: eventForm.winner ? serverTimestamp() : null
             });
 
-
-
-            // Attribuer les points et victoires au gagnant
-
+            // Attribuer les points et victoires aux gagnants (support multi-joueurs)
             if (eventForm.winner) {
+                // Découper les pseudos par virgule et nettoyer les espaces
+                const winners = eventForm.winner.split(',').map(w => w.trim()).filter(w => w);
+                const totalPoints = parseInt(eventForm.winnerPoints);
+                // Diviser les points (arrondi à l'inférieur)
+                const pointsPerPlayer = winners.length > 0 ? Math.floor(totalPoints / winners.length) : 0;
 
                 const usersRef = collection(db, "users");
 
-                const qWinner = query(usersRef, where("pseudo", "==", eventForm.winner));
+                // Boucle sur chaque gagnant
+                for (const winnerPseudo of winners) {
+                    const qWinner = query(usersRef, where("pseudo", "==", winnerPseudo));
+                    const snapshotWinner = await getDocs(qWinner);
 
-                const snapshotWinner = await getDocs(qWinner);
+                    if (!snapshotWinner.empty) {
+                        const winnerDoc = snapshotWinner.docs[0];
 
+                        // 1. Mise à jour Solde et Victoires
+                        await updateDoc(doc(db, "users", winnerDoc.id), {
+                            balance: increment(pointsPerPlayer),
+                            wins: increment(1)
+                        });
 
+                        // 2. Logique Badge (pour CE gagnant spécifique)
+                        if (editingEvent.typeId) {
+                            try {
+                                const qBadgeConfig = query(
+                                    collection(db, "badges"),
+                                    where("conditionType", "==", "first_victory_type"),
+                                    where("conditionValue", "==", editingEvent.typeId)
+                                );
+                                const snapshotBadgeConfig = await getDocs(qBadgeConfig);
 
-                if (!snapshotWinner.empty) {
+                                if (!snapshotBadgeConfig.empty) {
+                                    for (const badgeDoc of snapshotBadgeConfig.docs) {
+                                        const badgeData = badgeDoc.data();
 
-                    const winnerDoc = snapshotWinner.docs[0];
+                                        // Vérifier si CE user a déjà le badge
+                                        const userBadgesRef = collection(db, "users", winnerDoc.id, "badges");
+                                        const qUserBadge = query(userBadgesRef, where("name", "==", badgeData.name));
+                                        const snapshotUserBadge = await getDocs(qUserBadge);
 
-                    await updateDoc(doc(db, "users", winnerDoc.id), {
-
-                        balance: increment(parseInt(eventForm.winnerPoints)),
-
-                        wins: increment(1)
-
-                    });
-
-                    // --- LOGIQUE BADGE PREMIÈRE VICTOIRE PAR TYPE ---
-                    if (editingEvent.typeId && editingEvent.typeName) {
-                        try {
-                            // 1. Vérifier le nombre de victoires pour ce type
-                            const qWins = query(
-                                collection(db, "events"),
-                                where("winner", "==", eventForm.winner),
-                                where("typeId", "==", editingEvent.typeId)
-                            );
-                            const snapshotWins = await getDocs(qWins);
-                            const winCount = snapshotWins.size; // Devrait être au moins 1 (celle-ci)
-
-                            // Si c'est la toute première victoire (ou qu'on veut rétroactivement l'appliquer si < 2 pour éviter les doublons si ré-exécuté)
-                            if (winCount === 1) {
-                                const badgeName = `🏆 Expert ${editingEvent.typeName}`;
-                                const badgeDescription = `Première victoire dans un événement ${editingEvent.typeName}`;
-
-                                // 2. Vérifier si le badge existe déjà dans la collection "badges" (optionnel, mais propre)
-                                // On peut aussi juste l'ajouter directement au user.
-                                // Ici on va l'ajouter directement à la sous-collection "badges" du user pour faire simple et efficace.
-
-                                const userBadgesRef = collection(db, "users", winnerDoc.id, "badges");
-                                const qUserBadge = query(userBadgesRef, where("name", "==", badgeName));
-                                const snapshotUserBadge = await getDocs(qUserBadge);
-
-                                if (snapshotUserBadge.empty) {
-                                    await addDoc(userBadgesRef, {
-                                        name: badgeName,
-                                        description: badgeDescription,
-                                        icon: editingEvent.typeEmoji || "🏆", // Utiliser l'emoji du type ou une coupe par défaut
-                                        rarity: "rare",
-                                        obtainedAt: serverTimestamp()
-                                    });
-                                    setMessage(prev => prev + ` + Badge "${badgeName}" attribué !`);
+                                        if (snapshotUserBadge.empty) {
+                                            await addDoc(userBadgesRef, {
+                                                name: badgeData.name,
+                                                description: badgeData.description,
+                                                icon: badgeData.icon,
+                                                rarity: "rare",
+                                                obtainedAt: serverTimestamp()
+                                            });
+                                            // On ajoute au message global
+                                            setMessage(prev => (prev || "") + ` + Badge "${badgeData.name}" pour ${winnerPseudo} !`);
+                                        }
+                                    }
                                 }
+                            } catch (err) {
+                                console.error(`Erreur badge pour ${winnerPseudo}:`, err);
                             }
-                        } catch (err) {
-                            console.error("Erreur attribution badge type:", err);
                         }
                     }
-                    // ------------------------------------------------
-
                 }
-
             }
 
-
-
             // Attribuer les points au 2ème
-
             if (eventForm.secondPlace) {
 
                 const usersRef = collection(db, "users");
@@ -1509,43 +1498,40 @@ export default function Admin() {
                                         <label className="block font-bold mb-1 uppercase text-sm">Condition Type</label>
 
                                         <select
-
                                             className="neo-input"
-
                                             value={badgeForm.conditionType}
-
                                             onChange={e => setBadgeForm({ ...badgeForm, conditionType: e.target.value })}
-
                                         >
-
                                             <option value="wins">Victoires</option>
-
                                             <option value="balance">Solde (TC)</option>
-
                                             <option value="events">Participations</option>
-
+                                            <option value="first_victory_type">Première Victoire (Type)</option>
                                         </select>
-
                                     </div>
 
                                     <div>
-
                                         <label className="block font-bold mb-1 uppercase text-sm">Valeur Requise</label>
-
-                                        <input
-
-                                            type="number"
-
-                                            className="neo-input"
-
-                                            value={badgeForm.conditionValue}
-
-                                            onChange={e => setBadgeForm({ ...badgeForm, conditionValue: e.target.value })}
-
-                                            required
-
-                                        />
-
+                                        {badgeForm.conditionType === "first_victory_type" ? (
+                                            <select
+                                                className="neo-input"
+                                                value={badgeForm.conditionValue}
+                                                onChange={e => setBadgeForm({ ...badgeForm, conditionValue: e.target.value })}
+                                                required
+                                            >
+                                                <option value="">-- Choisir un type --</option>
+                                                {eventTypes.map(t => (
+                                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="number"
+                                                className="neo-input"
+                                                value={badgeForm.conditionValue}
+                                                onChange={e => setBadgeForm({ ...badgeForm, conditionValue: e.target.value })}
+                                                required
+                                            />
+                                        )}
                                     </div>
 
                                 </div>
@@ -1647,10 +1633,9 @@ export default function Admin() {
                                                 <div className="text-sm font-mono opacity-70">
 
                                                     {badge.conditionType === 'wins' && `🏆 ${badge.conditionValue} Victoires`}
-
                                                     {badge.conditionType === 'balance' && `💰 ${badge.conditionValue} TC`}
-
                                                     {badge.conditionType === 'events' && `📅 ${badge.conditionValue} Événements`}
+                                                    {badge.conditionType === 'first_victory_type' && `🥇 Première Victoire : ${eventTypes.find(t => t.id === badge.conditionValue)?.name || 'Type inconnu'}`}
 
                                                 </div>
 
@@ -2157,18 +2142,18 @@ export default function Admin() {
 
                                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
 
-                                    <div className="bg-white border-4 border-black p-6 max-w-md w-full">
+                                    <div className="bg-white border-4 border-black p-6 w-full max-w-md md:max-w-4xl">
 
                                         <h3 className="font-black text-xl mb-4">✏️ MODIFIER L'ÉVÉNEMENT</h3>
 
                                         <p className="font-bold mb-4">{editingEvent.name}</p>
 
-                                        <form onSubmit={saveEventResults} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                                        <form onSubmit={saveEventResults} className="space-y-4 max-h-[80vh] overflow-y-auto pr-2">
 
                                             {/* SECTION DETAILS */}
                                             <div className="bg-gray-100 p-3 border-2 border-black mb-4">
                                                 <h4 className="font-bold border-b-2 border-black mb-2">📝 DÉTAILS</h4>
-                                                <div className="space-y-2">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <div>
                                                         <label className="block font-bold text-xs uppercase">Nom</label>
                                                         <input
@@ -2217,7 +2202,7 @@ export default function Admin() {
                                                             placeholder="https://www.facebook.com/..."
                                                         />
                                                     </div>
-                                                    <div>
+                                                    <div className="md:col-span-2">
                                                         <label className="block font-bold text-xs uppercase">Description</label>
                                                         <textarea
                                                             value={eventForm.description}
@@ -2235,13 +2220,13 @@ export default function Admin() {
                                                 <div className="space-y-2">
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <div>
-                                                            <label className="block font-bold text-xs uppercase">🥇 Gagnant</label>
+                                                            <label className="block font-bold text-xs uppercase">🥇 Gagnant(s) (séparer par virgule)</label>
                                                             <input
                                                                 type="text"
                                                                 value={eventForm.winner}
                                                                 onChange={(e) => setEventForm({ ...eventForm, winner: e.target.value })}
                                                                 className="w-full p-1 border border-black text-sm"
-                                                                placeholder="Pseudo"
+                                                                placeholder="Pseudo1, Pseudo2..."
                                                             />
                                                         </div>
                                                         <div>
