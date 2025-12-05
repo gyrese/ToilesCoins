@@ -4,9 +4,9 @@
 
 Le niveau est calculé selon la formule suivante :
 - **1 Victoire** = 500 XP
-- **1 Événement participé** = 100 XP
+- **1 Événement participé** = 10 XP
 - **Niveau** = (XP total / 1000) + 1
-- **Niveau maximum** = 100
+- **Niveau maximum** = 50
 
 ### Formule
 ```javascript
@@ -16,11 +16,16 @@ const finalLevel = Math.min(50, level);
 ```
 
 ## 🎨 Paliers de Niveau et Effets Visuels
+### Niveau 1
+ Taille : 2rem
+- Couleur : Noir simple
+- Animation : `welcome-burst` (effet fort de bienvenue)
 
-### Niveau 1-9 : **Novice**
+
+### Niveau 2-9 : **Novice**
 - Taille : 2rem
 - Couleur : Noir simple
-- Animation : Légère apparition (fade-in)
+- Animation : Légère apparition (feu d'artifice)
 
 ### Niveau 10-19 : **Initié Bronze**
 - Taille : 2.2rem
@@ -75,6 +80,9 @@ const finalLevel = Math.min(50, level);
 
 ### `pulse`
 Agrandissement/rétrécissement doux (scale 1 → 1.05 → 1)
+
+### `welcome burst`
+les lettres changent de couleurs tout le temps dans un style carrtoon
 
 ### `float`
 Lévitation verticale (-5px → 0 → -5px)

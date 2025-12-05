@@ -24,6 +24,7 @@ interface UserData {
     balance: number;
     wins: number;
     eventsCount: number;
+    themeColor?: string;
 }
 
 interface AuthContextType {
@@ -89,6 +90,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             clearTimeout(timeout);
         };
     }, []);
+
+    // Appliquer la couleur de thème globalement
+    useEffect(() => {
+        if (userData && userData.themeColor) {
+            document.body.style.backgroundColor = userData.themeColor;
+        } else {
+            document.body.style.backgroundColor = "#FFC845"; // Couleur par défaut
+        }
+    }, [userData]);
 
     const signIn = async (email: string, password: string) => {
         await signInWithEmailAndPassword(auth, email, password);

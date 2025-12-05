@@ -116,7 +116,8 @@ export default function Admin() {
         winner: "",
         secondPlace: "",
         winnerPoints: "100",
-        secondPlacePoints: "50"
+        secondPlacePoints: "50",
+        typeId: ""
     });
 
     const [eventSubTab, setEventSubTab] = useState<"types" | "creation" | "history">("history");
@@ -737,7 +738,8 @@ export default function Admin() {
             winner: event.winner || "",
             secondPlace: event.secondPlace || "",
             winnerPoints: event.winnerPoints?.toString() || "100",
-            secondPlacePoints: event.secondPlacePoints?.toString() || "50"
+            secondPlacePoints: event.secondPlacePoints?.toString() || "50",
+            typeId: event.typeId || ""
         });
     };
 
@@ -771,7 +773,8 @@ export default function Admin() {
                 winnerPoints: parseInt(eventForm.winnerPoints),
                 secondPlacePoints: parseInt(eventForm.secondPlacePoints),
                 status: eventForm.winner ? "completed" : "upcoming",
-                completedAt: eventForm.winner ? serverTimestamp() : null
+                completedAt: eventForm.winner ? serverTimestamp() : null,
+                typeId: eventForm.typeId || null
             });
 
             // Attribuer les points et victoires aux gagnants (support multi-joueurs)
@@ -799,12 +802,13 @@ export default function Admin() {
                         });
 
                         // 2. Logique Badge (pour CE gagnant spécifique)
-                        if (editingEvent.typeId) {
+                        if (eventForm.typeId) {
                             try {
+                                const eventTypeId = eventForm.typeId.toString(); // Conversion explicite
                                 const qBadgeConfig = query(
                                     collection(db, "badges"),
                                     where("conditionType", "==", "first_victory_type"),
-                                    where("conditionValue", "==", editingEvent.typeId)
+                                    where("conditionValue", "==", eventTypeId)
                                 );
                                 const snapshotBadgeConfig = await getDocs(qBadgeConfig);
 
@@ -827,6 +831,36 @@ export default function Admin() {
                                             });
                                             // On ajoute au message global
                                             setMessage(prev => (prev || "") + ` + Badge "${badgeData.name}" pour ${winnerPseudo} !`);
+                                        }
+                                    }
+                                } else {
+                                    // Fallback: essayer avec conditionValue en nombre si c'est un nombre
+                                    if (!isNaN(Number(eventTypeId))) {
+                                        const qBadgeConfigNum = query(
+                                            collection(db, "badges"),
+                                            where("conditionType", "==", "first_victory_type"),
+                                            where("conditionValue", "==", Number(eventTypeId))
+                                        );
+                                        const snapshotBadgeConfigNum = await getDocs(qBadgeConfigNum);
+
+                                        if (!snapshotBadgeConfigNum.empty) {
+                                            for (const badgeDoc of snapshotBadgeConfigNum.docs) {
+                                                const badgeData = badgeDoc.data();
+                                                const userBadgesRef = collection(db, "users", winnerDoc.id, "badges");
+                                                const qUserBadge = query(userBadgesRef, where("name", "==", badgeData.name));
+                                                const snapshotUserBadge = await getDocs(qUserBadge);
+
+                                                if (snapshotUserBadge.empty) {
+                                                    await addDoc(userBadgesRef, {
+                                                        name: badgeData.name,
+                                                        description: badgeData.description,
+                                                        icon: badgeData.icon,
+                                                        rarity: "rare",
+                                                        obtainedAt: serverTimestamp()
+                                                    });
+                                                    setMessage(prev => (prev || "") + ` + Badge "${badgeData.name}" pour ${winnerPseudo} !`);
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -877,7 +911,8 @@ export default function Admin() {
                 winner: "",
                 secondPlace: "",
                 winnerPoints: "100",
-                secondPlacePoints: "50"
+                secondPlacePoints: "50",
+                typeId: ""
             });
 
 
@@ -1819,6 +1854,12 @@ export default function Admin() {
                                                     </div>
                                                     <div className="flex flex-col gap-2">
                                                         <button
+                                                            onClick={() => router.push(`/tournaments?typeId=${type.id}&typeName=${encodeURIComponent(type.name)}`)}
+                                                            className="neo-btn bg-green-400 hover:bg-green-300"
+                                                        >
+                                                            🏆 TOURNOI
+                                                        </button>
+                                                        <button
                                                             onClick={() => {
                                                                 setEditingEventType(type);
                                                                 setNewEventType({
@@ -1879,6 +1920,8 @@ export default function Admin() {
 
                                                 }
 
+                                                const isTournament = formData.get('isTournament') === 'on';
+
                                                 await addDoc(collection(db, "events"), {
 
                                                     name: formData.get('eventName'),
@@ -1899,6 +1942,8 @@ export default function Admin() {
 
                                                     imageUrl: finalImageUrl || null,
                                                     link: eventLinkInput || null,
+
+                                                    isTournament: isTournament,
 
                                                     status: "upcoming",
 
@@ -2074,51 +2119,61 @@ export default function Admin() {
 
                                                     rows={3}
 
-                                                    placeholder="Description de l'événement..."
+                                                    placeholder="Décrivez l'événement..."
 
-                                                ></textarea>
+                                                />
 
                                             </div>
 
-                                            <div className="grid md:grid-cols-2 gap-3">
+                                            <div>
 
-                                                <div>
+                                                <label className="block font-bold mb-1 text-sm">IMAGE (URL ou fichier)</label>
 
-                                                    <label className="block font-bold mb-1 text-sm">IMAGE (URL)</label>
+                                                <input
+
+                                                    type="text"
+
+                                                    name="eventImageUrl"
+
+                                                    className="w-full p-2 border-2 border-black mb-2"
+
+                                                    placeholder="https://..."
+
+                                                />
+
+                                                <input
+
+                                                    type="file"
+
+                                                    name="eventImageFile"
+
+                                                    accept="image/*"
+
+                                                    className="w-full p-2 border-2 border-black text-sm"
+
+                                                />
+
+                                            </div>
+
+                                            <div className="p-4 bg-purple-100 border-2 border-purple-600">
+
+                                                <label className="flex items-center gap-3 cursor-pointer">
 
                                                     <input
 
-                                                        type="url"
+                                                        type="checkbox"
 
-                                                        name="eventImageUrl"
+                                                        name="isTournament"
 
-                                                        className="w-full p-2 border-2 border-black"
-
-                                                        placeholder="https://exemple.com/image.jpg"
+                                                        className="w-5 h-5 border-2 border-black"
 
                                                     />
 
-                                                </div>
+                                                    <span className="font-bold text-sm uppercase">🏆 Cet événement est un TOURNOI</span>
 
-                                                <div>
+                                                </label>
 
-                                                    <label className="block font-bold mb-1 text-sm">OU IMPORTER UN FICHIER</label>
-
-                                                    <input
-
-                                                        type="file"
-
-                                                        name="eventImageFile"
-
-                                                        accept="image/*"
-
-                                                        className="w-full p-2 border-2 border-dashed border-black bg-white"
-
-                                                    />
-
-                                                    <p className="text-xs mt-1 italic">Le fichier sera intégré directement dans l'événement.</p>
-
-                                                </div>
+                                                <p className="text-xs mt-2 opacity-70">Cochez cette case si vous souhaitez gérer cet événement comme un tournoi avec bracket.</p>
 
                                             </div>
 
@@ -2366,7 +2421,16 @@ export default function Admin() {
 
                                                         </div>
 
-                                                        <div className="flex gap-2 ml-4">
+                                                        <div className="flex flex-col gap-2 ml-4">
+
+                                                            {event.isTournament && event.status !== 'completed' && event.typeId && (
+                                                                <button
+                                                                    onClick={() => router.push(`/tournaments?typeId=${event.typeId}&typeName=${encodeURIComponent(event.typeName || 'Tournoi')}&eventId=${event.id}`)}
+                                                                    className="px-3 py-2 bg-purple-400 border-2 border-black font-bold text-sm hover:bg-purple-300 whitespace-nowrap"
+                                                                >
+                                                                    🏆 GÉRER TOURNOI
+                                                                </button>
+                                                            )}
 
                                                             <button
                                                                 onClick={() => startEditEvent(event)}

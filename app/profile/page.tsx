@@ -33,6 +33,7 @@ export default function Profile() {
     const [editAvatar, setEditAvatar] = useState("");
     const [editBio, setEditBio] = useState("");
     const [editPseudo, setEditPseudo] = useState("");
+    const [editThemeColor, setEditThemeColor] = useState("#FFC845"); // Couleur par défaut
 
     // Level calculation (1-50)
     const calculateLevel = () => {
@@ -60,6 +61,10 @@ export default function Profile() {
             setEditAvatar(userData.photoURL || "");
             setEditBio(userData.bio || "");
             setEditPseudo(userData.pseudo || "");
+            const themeColor = userData.themeColor || "#FFC845";
+            setEditThemeColor(themeColor);
+            // Appliquer la couleur au body
+            document.body.style.backgroundColor = themeColor;
         }
     }, [user, loading, router, userData]);
 
@@ -192,8 +197,11 @@ export default function Profile() {
             await updateDoc(doc(db, "users", user.uid), {
                 pseudo: editPseudo.trim(),
                 photoURL: editAvatar || currentAvatar,
-                bio: editBio
+                bio: editBio,
+                themeColor: editThemeColor
             });
+            // Appliquer la nouvelle couleur immédiatement
+            document.body.style.backgroundColor = editThemeColor;
             setIsEditing(false);
         } catch (error) {
             console.error(error);
@@ -655,6 +663,59 @@ export default function Profile() {
                                 onChange={(e) => setEditBio(e.target.value)}
                                 placeholder="Votre phrase fétiche..."
                             ></textarea>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="form-label font-weight-bold d-flex align-items-center gap-2">
+                                🎨 COULEUR DU SITE
+                            </label>
+                            <div className="d-flex gap-3 justify-content-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditThemeColor("#FFC845")}
+                                    className={`btn border-3 border-dark ${editThemeColor === "#FFC845" ? "border-5" : ""}`}
+                                    style={{
+                                        width: "80px",
+                                        height: "80px",
+                                        backgroundColor: "#FFC845",
+                                        boxShadow: editThemeColor === "#FFC845" ? "0 0 0 3px #000" : "none"
+                                    }}
+                                    title="Jaune (défaut)"
+                                >
+                                    {editThemeColor === "#FFC845" && <span className="font-weight-bold" style={{ fontSize: "2rem" }}>✓</span>}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setEditThemeColor("#5E9398")}
+                                    className={`btn border-3 border-dark ${editThemeColor === "#5E9398" ? "border-5" : ""}`}
+                                    style={{
+                                        width: "80px",
+                                        height: "80px",
+                                        backgroundColor: "#5E9398",
+                                        boxShadow: editThemeColor === "#5E9398" ? "0 0 0 3px #000" : "none"
+                                    }}
+                                    title="Bleu-vert"
+                                >
+                                    {editThemeColor === "#5E9398" && <span className="font-weight-bold text-white" style={{ fontSize: "2rem" }}>✓</span>}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setEditThemeColor("#8E2510")}
+                                    className={`btn border-3 border-dark ${editThemeColor === "#8E2510" ? "border-5" : ""}`}
+                                    style={{
+                                        width: "80px",
+                                        height: "80px",
+                                        backgroundColor: "#8E2510",
+                                        boxShadow: editThemeColor === "#8E2510" ? "0 0 0 3px #000" : "none"
+                                    }}
+                                    title="Rouge brique"
+                                >
+                                    {editThemeColor === "#8E2510" && <span className="font-weight-bold text-white" style={{ fontSize: "2rem" }}>✓</span>}
+                                </button>
+                            </div>
+                            <div className="form-text small text-center mt-2">Choisissez la couleur de fond du site</div>
                         </div>
 
                         <button className="btn btn-dark w-100 font-impact py-2" style={{ fontSize: '1.2rem' }} onClick={handleSaveProfile}>

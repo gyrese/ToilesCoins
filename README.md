@@ -32,6 +32,31 @@ Pour activer le backend complet :
 -   **Boutique** : Échange de points contre récompenses.
 -   **Profil** : Badges, statistiques et classement.
 -   **Admin** : Gestion des points et événements (accessible via `/admin`).
+-   **🏆 Tournois** : Système complet de gestion de tournois avec bracket, scores et récompenses automatiques.
+
+## Système de Tournois
+
+Le système de tournois permet aux administrateurs de créer et gérer des compétitions complètes :
+
+-   **Création de tournois** personnalisés par type d'événement
+-   **Ajout de joueurs** inscrits ou invités
+-   **Génération automatique** d'arbre de tournoi (bracket)
+-   **Gestion des matchs** avec saisie de scores en temps réel
+-   **Attribution automatique** de récompenses (500/300/150 TC)
+-   **Enregistrement** des résultats dans Firebase
+
+### Accès rapide
+1. Aller sur `/admin`
+2. Onglet **ÉVÉNEMENTS** → **TYPES**
+3. Cliquer sur **🏆 TOURNOI** pour n'importe quel type
+
+### Documentation complète
+- 📚 **[TOURNAMENT_INDEX.md](./TOURNAMENT_INDEX.md)** - Index de navigation
+- 🚀 **[TOURNAMENT_SUMMARY.md](./TOURNAMENT_SUMMARY.md)** - Résumé exécutif
+- 📘 **[TOURNAMENT_SYSTEM.md](./TOURNAMENT_SYSTEM.md)** - Guide d'utilisation
+- 🧪 **[TOURNAMENT_TESTING.md](./TOURNAMENT_TESTING.md)** - Guide de test
+- 💻 **[TOURNAMENT_EXAMPLES.md](./TOURNAMENT_EXAMPLES.md)** - Exemples de code
+
 
 ## Technologies
 
