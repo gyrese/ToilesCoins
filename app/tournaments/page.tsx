@@ -951,14 +951,14 @@ function TournamentContent() {
         }
 
         try {
-            const tournamentData = {
+            const tournamentData = cleanForFirestore({
                 ...tournament,
                 winner,
                 secondPlace,
                 thirdPlace,
                 status: 'completed' as const,
                 completedAt: serverTimestamp()
-            };
+            });
 
             let tournamentId = tournament.id;
             if (tournamentId) {
@@ -1103,8 +1103,8 @@ function TournamentContent() {
             });
 
         } catch (error) {
-            console.error(error);
-            setMessage("❌ Erreur lors de l'enregistrement des résultats");
+            console.error("Erreur complète:", error);
+            setMessage("❌ Erreur lors de l'enregistrement: " + (error as Error).message);
         }
     };
 
