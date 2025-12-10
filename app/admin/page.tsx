@@ -134,9 +134,14 @@ export default function Admin() {
     });
     const [editingEventType, setEditingEventType] = useState<any>(null);
 
+    // Delete confirmation modal state
+    const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; eventId: string | null; eventName: string }>({
+        show: false,
+        eventId: null,
+        eventName: ""
+    });
 
 
-    // Auth Redirect
 
     useEffect(() => {
 
@@ -1024,30 +1029,33 @@ export default function Admin() {
 
 
 
-    const deleteEvent = async (id: string) => {
+    // Show delete confirmation modal
+    const askDeleteEvent = (eventId: string, eventName: string) => {
+        setDeleteConfirm({ show: true, eventId, eventName });
+    };
 
-        if (!confirm("Supprimer cet ÉVÉNEMENT ?")) return;
+    // Actually delete the event after confirmation
+    const confirmDeleteEvent = async () => {
+        if (!deleteConfirm.eventId) return;
 
+        const id = deleteConfirm.eventId;
+        setDeleteConfirm({ show: false, eventId: null, eventName: "" });
         setMessage("");
 
         try {
-
             await deleteDoc(doc(db, "events", id));
-
             setEvents(events.filter(t => t.id !== id));
-
             setMessage("✅ ÉVÉNEMENT supprimé");
-
         } catch (error) {
-
-            console.error(error);
-
-            setMessage("❌ Erreur technique");
-
+            console.error("Delete error:", error);
+            setMessage("❌ Erreur technique: " + (error as Error).message);
         }
-
     };
 
+    // Cancel delete
+    const cancelDeleteEvent = () => {
+        setDeleteConfirm({ show: false, eventId: null, eventName: "" });
+    };
 
 
     return (
@@ -1055,6 +1063,33 @@ export default function Admin() {
         <>
 
             <Header />
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm.show && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white border-4 border-black p-6 max-w-md mx-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                        <h3 className="text-xl font-black uppercase mb-4">⚠️ Confirmer la suppression</h3>
+                        <p className="mb-6">
+                            Voulez-vous vraiment supprimer l'événement <strong>"{deleteConfirm.eventName}"</strong> ?
+                            <br /><span className="text-red-600 text-sm font-bold">Cette action est irréversible.</span>
+                        </p>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={cancelDeleteEvent}
+                                className="flex-1 neo-btn bg-gray-200 hover:bg-gray-100"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={confirmDeleteEvent}
+                                className="flex-1 neo-btn bg-red-400 hover:bg-red-300"
+                            >
+                                🗑️ Supprimer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <main className="layout-container pb-32">
 
@@ -2197,7 +2232,7 @@ export default function Admin() {
 
                                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
 
-                                    <div className="bg-white border-4 border-black p-6 w-full max-w-md md:max-w-4xl">
+                                    <div className="bg-white border-4 border-black p-6 w-full max-w-md md:max-w-3xl">
 
                                         <h3 className="font-black text-xl mb-4">✏️ MODIFIER L'ÉVÉNEMENT</h3>
 
@@ -2440,15 +2475,11 @@ export default function Admin() {
                                                             </button>
 
                                                             <button
-
-                                                                onClick={() => deleteEvent(event.id)}
-
+                                                                type="button"
+                                                                onClick={() => askDeleteEvent(event.id, event.name)}
                                                                 className="px-3 py-1 bg-red-400 border-2 border-black font-bold text-sm hover:bg-red-300"
-
                                                             >
-
                                                                 SUPP
-
                                                             </button>
 
                                                         </div>

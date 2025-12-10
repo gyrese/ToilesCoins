@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { Trophy, Users, Calendar, MapPin, Medal, Award } from "lucide-react";
 
 interface Player {
     id: string;
     name: string;
     isRegistered: boolean;
+    userId?: string;
     groupId?: string;
     groupPoints?: number;
     groupWins?: number;
@@ -61,315 +61,397 @@ export default function PublicTournament() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [currentUrl, setCurrentUrl] = useState("");
+    const [playerAvatars, setPlayerAvatars] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setCurrentUrl(window.location.href);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!tournament) return;
+        const loadAvatars = async () => {
+            const avatars: Record<string, string> = {};
+            for (const player of tournament.players) {
+                if (player.isRegistered && player.userId) {
+                    try {
+                        const userDoc = await getDoc(doc(db, "users", player.userId));
+                        if (userDoc.exists() && userDoc.data().avatarUrl) {
+                            avatars[player.id] = userDoc.data().avatarUrl;
+                        }
+                    } catch (err) { /* ignore */ }
+                }
+            }
+            setPlayerAvatars(avatars);
+        };
+        loadAvatars();
+    }, [tournament?.players]);
 
     useEffect(() => {
         if (!publicId) return;
-
-        // Real-time listener for tournament updates
         const q = query(collection(db, "tournaments"), where("publicId", "==", publicId));
-
         const unsubscribe = onSnapshot(q, (snapshot) => {
             if (snapshot.empty) {
                 setError("Tournoi introuvable");
                 setLoading(false);
                 return;
             }
-
-            const doc = snapshot.docs[0];
-            const data = doc.data();
+            const docSnap = snapshot.docs[0];
+            const data = docSnap.data();
             setTournament({
-                id: doc.id,
+                id: docSnap.id,
                 ...data,
                 date: data.date?.toDate?.() || new Date(data.date)
             } as Tournament);
             setLoading(false);
-        }, (err) => {
-            console.error(err);
+        }, () => {
             setError("Erreur de chargement");
             setLoading(false);
         });
-
         return () => unsubscribe();
     }, [publicId]);
 
+    const PlayerAvatar = ({ player, size = 40 }: { player?: Player; size?: number }) => {
+        if (!player || player.name === 'TBD') {
+            return (
+                <div
+                    className="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white"
+                    style={{ width: size, height: size, fontSize: size * 0.4 }}
+                >?</div>
+            );
+        }
+        const avatarUrl = playerAvatars[player.id];
+        const initials = player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const colors = ['bg-primary', 'bg-success', 'bg-info', 'bg-warning', 'bg-danger', 'bg-secondary'];
+        const colorClass = colors[player.name.charCodeAt(0) % colors.length];
+
+        if (avatarUrl) {
+            return (
+                <img
+                    src={avatarUrl}
+                    alt={player.name}
+                    className="rounded-circle"
+                    style={{ width: size, height: size, objectFit: 'cover' }}
+                />
+            );
+        }
+        return (
+            <div
+                className={`rounded-circle ${colorClass} d-flex align-items-center justify-content-center text-white fw-bold`}
+                style={{ width: size, height: size, fontSize: size * 0.4 }}
+            >{initials}</div>
+        );
+    };
+
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#FFC845] flex items-center justify-center">
-                <div className="text-center">
-                    <Trophy size={60} className="mx-auto mb-4 animate-bounce" />
-                    <p className="font-black text-xl">CHARGEMENT DU TOURNOI...</p>
+            <>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+                <div className="min-vh-100 d-flex align-items-center justify-content-center bg-warning">
+                    <div className="text-center">
+                        <div className="spinner-border text-dark mb-3" style={{ width: '3rem', height: '3rem' }} />
+                        <h4 className="fw-bold">Chargement du tournoi...</h4>
+                    </div>
                 </div>
-            </div>
+            </>
         );
     }
 
     if (error || !tournament) {
         return (
-            <div className="min-h-screen bg-[#FFC845] flex items-center justify-center p-4">
-                <div className="neo-card text-center max-w-md">
-                    <h1 className="text-2xl font-black mb-4">❌ {error || "Tournoi introuvable"}</h1>
-                    <p className="mb-4">Ce tournoi n'existe pas ou a été supprimé.</p>
-                    <a href="/" className="neo-btn bg-white inline-block">RETOUR À L'ACCUEIL</a>
+            <>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+                <div className="min-vh-100 d-flex align-items-center justify-content-center bg-warning p-4">
+                    <div className="card text-center p-5 shadow-lg">
+                        <h1 className="display-1 mb-3">❌</h1>
+                        <h3 className="fw-bold mb-3">{error || "Tournoi introuvable"}</h3>
+                        <a href="/" className="btn btn-dark btn-lg">Retour à l'accueil</a>
+                    </div>
                 </div>
-            </div>
+            </>
         );
     }
 
     const knockoutMatches = tournament.matches.filter(m => m.phase === 'knockout');
-    const totalKnockoutRounds = knockoutMatches.length > 0
-        ? Math.max(...knockoutMatches.map(m => m.round))
-        : 0;
+    const totalKnockoutRounds = knockoutMatches.length > 0 ? Math.max(...knockoutMatches.map(m => m.round)) : 0;
+    const getMatchesByRound = (round: number) => knockoutMatches.filter(m => m.round === round);
+    const getGroupMatches = (groupId: string) => tournament.matches.filter(m => m.phase === 'group' && m.groupId === groupId);
 
-    const getMatchesByRound = (round: number) => {
-        return knockoutMatches.filter(m => m.round === round);
-    };
-
-    const getGroupMatches = (groupId: string) => {
-        return tournament.matches.filter(m => m.phase === 'group' && m.groupId === groupId);
+    const getRoundName = (round: number) => {
+        if (round === totalKnockoutRounds) return '🏆 Finale';
+        if (round === totalKnockoutRounds - 1) return '⚔️ Demi-finales';
+        if (round === totalKnockoutRounds - 2) return '🎯 Quarts de finale';
+        return `Tour ${round}`;
     };
 
     return (
-        <div className="min-h-screen bg-[#FFC845] p-4">
-            {/* Header */}
-            <div className="max-w-4xl mx-auto mb-6">
-                <div className="neo-card bg-black text-white overflow-hidden">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        {tournament.imageUrl && (
-                            <div className="w-full md:w-48 h-32 md:h-auto border-2 border-yellow-400 overflow-hidden flex-shrink-0">
-                                <img
-                                    src={tournament.imageUrl}
-                                    alt={tournament.name}
-                                    className="w-full h-full object-cover"
-                                />
-                            </div>
-                        )}
+        <>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
 
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Trophy size={24} className="text-yellow-400" />
-                                <span className="text-yellow-400 font-bold text-sm uppercase">
-                                    {tournament.eventTypeName}
-                                </span>
-                                {tournament.status === 'ongoing' && (
-                                    <span className="bg-green-500 text-white text-xs px-2 py-1 font-bold animate-pulse">
-                                        EN COURS
-                                    </span>
-                                )}
-                                {tournament.status === 'completed' && (
-                                    <span className="bg-blue-500 text-white text-xs px-2 py-1 font-bold">
-                                        TERMINÉ
-                                    </span>
-                                )}
+            <div className="min-vh-100" style={{ backgroundColor: '#FFC845' }}>
+                {/* Header */}
+                <div className="bg-dark text-white">
+                    {tournament.imageUrl && (
+                        <div style={{ height: '200px', overflow: 'hidden' }}>
+                            <img src={tournament.imageUrl} alt="" className="w-100 h-100" style={{ objectFit: 'cover', opacity: 0.5 }} />
+                        </div>
+                    )}
+
+                    <div className="container py-4">
+                        <div className="row align-items-center">
+                            <div className="col-md-8">
+                                <div className="d-flex gap-2 mb-2 flex-wrap">
+                                    <span className="badge bg-warning text-dark">{tournament.eventTypeName}</span>
+                                    {tournament.status === 'ongoing' && (
+                                        <span className="badge bg-danger">
+                                            <i className="bi bi-broadcast me-1"></i> EN DIRECT
+                                        </span>
+                                    )}
+                                    {tournament.status === 'completed' && (
+                                        <span className="badge bg-success">
+                                            <i className="bi bi-check-circle me-1"></i> Terminé
+                                        </span>
+                                    )}
+                                </div>
+                                <h1 className="display-5 fw-bold mb-3">{tournament.name}</h1>
+                                <div className="d-flex gap-4 text-white-50 flex-wrap">
+                                    <span><i className="bi bi-calendar3 me-1"></i> {new Date(tournament.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                                    {tournament.place && <span><i className="bi bi-geo-alt me-1"></i> {tournament.place}</span>}
+                                    <span><i className="bi bi-people me-1"></i> {tournament.players.length} joueurs</span>
+                                </div>
                             </div>
-                            <h1 className="text-xl md:text-2xl font-black uppercase mb-2">
-                                {tournament.name}
-                            </h1>
-                            <div className="flex flex-wrap gap-4 text-sm">
-                                <div className="flex items-center gap-1">
-                                    <Calendar size={14} />
-                                    <span>{new Date(tournament.date).toLocaleDateString('fr-FR')}</span>
+                            <div className="col-md-4 text-center text-md-end mt-4 mt-md-0">
+                                <div className="bg-white d-inline-block p-2 rounded">
+                                    <img
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(currentUrl || `https://toilescoins.com/tournament/${publicId}`)}`}
+                                        alt="QR Code"
+                                        style={{ width: 100, height: 100 }}
+                                    />
                                 </div>
-                                {tournament.place && (
-                                    <div className="flex items-center gap-1">
-                                        <MapPin size={14} />
-                                        <span>{tournament.place}</span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-1">
-                                    <Users size={14} />
-                                    <span>{tournament.players.length} joueurs</span>
-                                </div>
+                                <div className="text-white-50 small mt-2">📱 Scannez pour suivre</div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="max-w-4xl mx-auto space-y-6">
-                {/* Winner Display (if completed) */}
-                {tournament.status === 'completed' && tournament.winner && (
-                    <div className="neo-card bg-gradient-to-br from-yellow-400 to-yellow-600 text-black text-center">
-                        <Trophy size={60} className="mx-auto mb-2" />
-                        <h2 className="text-3xl font-black uppercase mb-1">🏆 CHAMPION 🏆</h2>
-                        <p className="text-4xl font-black mb-4">{tournament.winner.name}</p>
-
-                        <div className="grid grid-cols-2 gap-4 mt-4">
-                            {tournament.secondPlace && (
-                                <div className="bg-white/50 p-3 border-2 border-black">
-                                    <Medal size={30} className="mx-auto mb-1" />
-                                    <div className="font-black">🥈 2ème</div>
-                                    <div className="text-lg font-bold">{tournament.secondPlace.name}</div>
+                <div className="container py-4">
+                    {/* Champion */}
+                    {tournament.status === 'completed' && tournament.winner && (
+                        <div className="card bg-warning border-0 shadow-lg mb-4">
+                            <div className="card-body text-center py-5">
+                                <h2 className="display-1 mb-2">🏆</h2>
+                                <h3 className="text-uppercase text-muted mb-3">Champion</h3>
+                                <div className="d-flex align-items-center justify-content-center gap-3 mb-4">
+                                    <PlayerAvatar player={tournament.winner} size={60} />
+                                    <h2 className="display-6 fw-bold mb-0">{tournament.winner.name}</h2>
                                 </div>
-                            )}
-                            {tournament.thirdPlace && (
-                                <div className="bg-white/50 p-3 border-2 border-black">
-                                    <Award size={30} className="mx-auto mb-1" />
-                                    <div className="font-black">🥉 3ème</div>
-                                    <div className="text-lg font-bold">{tournament.thirdPlace.name}</div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
 
-                {/* Players List */}
-                <div className="neo-card">
-                    <h2 className="text-xl font-black uppercase mb-4">👥 Participants ({tournament.players.length})</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        {tournament.players.map(player => (
-                            <div
-                                key={player.id}
-                                className={`p-2 border-2 text-center text-sm font-bold ${tournament.winner?.id === player.id
-                                        ? 'border-yellow-500 bg-yellow-100'
-                                        : tournament.secondPlace?.id === player.id
-                                            ? 'border-gray-400 bg-gray-100'
-                                            : tournament.thirdPlace?.id === player.id
-                                                ? 'border-orange-400 bg-orange-100'
-                                                : 'border-black bg-white'
-                                    }`}
-                            >
-                                {tournament.winner?.id === player.id && '🏆 '}
-                                {tournament.secondPlace?.id === player.id && '🥈 '}
-                                {tournament.thirdPlace?.id === player.id && '🥉 '}
-                                {player.name}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Group Stage */}
-                {tournament.format === 'groups' && tournament.groups.length > 0 && (
-                    <div className="neo-card">
-                        <h2 className="text-xl font-black uppercase mb-4">🏟️ Phase de Poules</h2>
-
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {tournament.groups.map(group => (
-                                <div key={group.id} className="border-2 border-black p-3 bg-white">
-                                    <h3 className="font-black text-lg mb-2 bg-black text-white p-2 -m-3 mb-3">
-                                        {group.name}
-                                    </h3>
-
-                                    {/* Standings */}
-                                    <div className="mb-3">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b-2 border-black">
-                                                    <th className="text-left p-1">#</th>
-                                                    <th className="text-left p-1">Joueur</th>
-                                                    <th className="text-center p-1">V</th>
-                                                    <th className="text-center p-1">D</th>
-                                                    <th className="text-center p-1">Pts</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {tournament.players
-                                                    .filter(p => p.groupId === group.id)
-                                                    .sort((a, b) => (b.groupPoints || 0) - (a.groupPoints || 0))
-                                                    .map((player, idx) => (
-                                                        <tr key={player.id} className={idx < 2 ? 'bg-green-50 font-bold' : ''}>
-                                                            <td className="p-1">{idx + 1}</td>
-                                                            <td className="p-1">{player.name}</td>
-                                                            <td className="text-center p-1">{player.groupWins || 0}</td>
-                                                            <td className="text-center p-1">{player.groupLosses || 0}</td>
-                                                            <td className="text-center p-1 font-black">{player.groupPoints || 0}</td>
-                                                        </tr>
-                                                    ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* Group Matches */}
-                                    <div className="space-y-1">
-                                        {getGroupMatches(group.id).map(match => (
-                                            <div key={match.id} className="p-2 bg-gray-50 border border-gray-300 text-sm flex justify-between items-center">
-                                                <span className={match.winner?.id === match.player1?.id ? 'font-black text-green-600' : ''}>
-                                                    {match.player1?.name}
-                                                </span>
-                                                <span className="font-black text-lg">
-                                                    {match.score1 ?? '-'} : {match.score2 ?? '-'}
-                                                </span>
-                                                <span className={match.winner?.id === match.player2?.id ? 'font-black text-green-600' : ''}>
-                                                    {match.player2?.name}
-                                                </span>
+                                {(tournament.secondPlace || tournament.thirdPlace) && (
+                                    <div className="d-flex justify-content-center gap-4 flex-wrap">
+                                        {tournament.secondPlace && (
+                                            <div className="d-flex align-items-center gap-2 bg-white bg-opacity-50 px-4 py-2 rounded">
+                                                <span className="fs-4">🥈</span>
+                                                <PlayerAvatar player={tournament.secondPlace} size={32} />
+                                                <span className="fw-bold">{tournament.secondPlace.name}</span>
                                             </div>
-                                        ))}
+                                        )}
+                                        {tournament.thirdPlace && (
+                                            <div className="d-flex align-items-center gap-2 bg-white bg-opacity-50 px-4 py-2 rounded">
+                                                <span className="fs-4">🥉</span>
+                                                <PlayerAvatar player={tournament.thirdPlace} size={32} />
+                                                <span className="fw-bold">{tournament.thirdPlace.name}</span>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* Knockout Stage */}
-                {knockoutMatches.length > 0 && (
-                    <div className="neo-card">
-                        <h2 className="text-xl font-black uppercase mb-4">⚔️ Phase Éliminatoire</h2>
+                    {/* Matchs */}
+                    {knockoutMatches.length > 0 && (
+                        <div className="card shadow-sm mb-4">
+                            <div className="card-header bg-dark text-white">
+                                <h5 className="mb-0"><i className="bi bi-trophy me-2"></i>Matchs</h5>
+                            </div>
+                            <div className="card-body">
+                                {Array.from({ length: totalKnockoutRounds }, (_, i) => totalKnockoutRounds - i).map(round => (
+                                    <div key={round} className="mb-4">
+                                        <h6 className="text-muted text-uppercase mb-3">{getRoundName(round)}</h6>
 
-                        <div className="space-y-6">
-                            {Array.from({ length: totalKnockoutRounds }, (_, i) => totalKnockoutRounds - i).map(round => (
-                                <div key={round}>
-                                    <h3 className="text-lg font-black uppercase mb-3 bg-black text-white p-2 text-center">
-                                        {round === totalKnockoutRounds ? '🏆 FINALE' :
-                                            round === totalKnockoutRounds - 1 ? '🥇 DEMI-FINALES' :
-                                                round === totalKnockoutRounds - 2 ? '🎯 QUARTS DE FINALE' :
-                                                    `ROUND ${round}`}
-                                    </h3>
+                                        <div className="row g-3">
+                                            {getMatchesByRound(round).map(match => (
+                                                <div key={match.id} className={round === totalKnockoutRounds ? 'col-12 col-md-8 mx-auto' : 'col-12 col-md-6'}>
+                                                    <div className={`card ${round === totalKnockoutRounds ? 'border-warning border-3' : ''}`}>
+                                                        <div className="card-body p-0">
+                                                            {/* Player 1 */}
+                                                            <div className={`d-flex align-items-center p-3 ${match.winner?.id === match.player1?.id ? 'bg-success bg-opacity-10' : ''}`}>
+                                                                <PlayerAvatar player={match.player1} size={40} />
+                                                                <div className="ms-3 flex-grow-1">
+                                                                    <span className={`fw-semibold ${match.winner?.id === match.player1?.id ? 'text-success' : ''}`}>
+                                                                        {match.player1?.name || <span className="text-muted">En attente...</span>}
+                                                                    </span>
+                                                                    {match.player1?.isRegistered && (
+                                                                        <span className="badge bg-primary ms-2" style={{ fontSize: '10px' }}>Membre</span>
+                                                                    )}
+                                                                </div>
+                                                                <span className={`fs-3 fw-bold ${match.winner?.id === match.player1?.id ? 'text-success' : 'text-muted'}`}>
+                                                                    {match.score1 ?? '-'}
+                                                                </span>
+                                                            </div>
 
-                                    <div className="grid gap-3 md:grid-cols-2">
-                                        {getMatchesByRound(round).map(match => (
-                                            <div
-                                                key={match.id}
-                                                className={`p-3 border-4 ${round === totalKnockoutRounds
-                                                        ? 'border-yellow-500 bg-yellow-50'
-                                                        : 'border-black bg-white'
-                                                    }`}
-                                            >
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <span className={`font-bold ${match.winner?.id === match.player1?.id ? 'text-green-600' : ''}`}>
-                                                        {match.player1?.name || 'En attente...'}
-                                                    </span>
-                                                    <span className="text-xl font-black bg-gray-100 px-3 py-1 border-2 border-black">
-                                                        {match.score1 ?? '-'}
-                                                    </span>
-                                                </div>
+                                                            <hr className="my-0" />
 
-                                                <div className="text-center text-xs font-bold text-gray-500 my-1">VS</div>
-
-                                                <div className="flex justify-between items-center">
-                                                    <span className={`font-bold ${match.winner?.id === match.player2?.id ? 'text-green-600' : ''}`}>
-                                                        {match.player2?.name || 'En attente...'}
-                                                    </span>
-                                                    <span className="text-xl font-black bg-gray-100 px-3 py-1 border-2 border-black">
-                                                        {match.score2 ?? '-'}
-                                                    </span>
-                                                </div>
-
-                                                {match.winner && (
-                                                    <div className="text-center mt-2 pt-2 border-t-2 border-gray-200">
-                                                        <span className="text-sm font-black text-green-600">
-                                                            ✅ Vainqueur: {match.winner.name}
-                                                        </span>
+                                                            {/* Player 2 */}
+                                                            <div className={`d-flex align-items-center p-3 ${match.winner?.id === match.player2?.id ? 'bg-success bg-opacity-10' : ''}`}>
+                                                                <PlayerAvatar player={match.player2} size={40} />
+                                                                <div className="ms-3 flex-grow-1">
+                                                                    <span className={`fw-semibold ${match.winner?.id === match.player2?.id ? 'text-success' : ''}`}>
+                                                                        {match.player2?.name || <span className="text-muted">En attente...</span>}
+                                                                    </span>
+                                                                    {match.player2?.isRegistered && (
+                                                                        <span className="badge bg-primary ms-2" style={{ fontSize: '10px' }}>Membre</span>
+                                                                    )}
+                                                                </div>
+                                                                <span className={`fs-3 fw-bold ${match.winner?.id === match.player2?.id ? 'text-success' : 'text-muted'}`}>
+                                                                    {match.score2 ?? '-'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                )}
-                                            </div>
-                                        ))}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Poules */}
+                    {tournament.format === 'groups' && tournament.groups.length > 0 && (
+                        <div className="card shadow-sm mb-4">
+                            <div className="card-header bg-dark text-white">
+                                <h5 className="mb-0"><i className="bi bi-grid-3x3-gap me-2"></i>Phase de Poules</h5>
+                            </div>
+                            <div className="card-body">
+                                <div className="row g-4">
+                                    {tournament.groups.map(group => (
+                                        <div key={group.id} className="col-12 col-lg-6">
+                                            <div className="card">
+                                                <div className="card-header bg-secondary text-white fw-bold">
+                                                    {group.name}
+                                                </div>
+                                                <div className="card-body p-0">
+                                                    <table className="table table-sm mb-0">
+                                                        <thead className="table-light">
+                                                            <tr>
+                                                                <th>#</th>
+                                                                <th>Joueur</th>
+                                                                <th className="text-center">V</th>
+                                                                <th className="text-center">D</th>
+                                                                <th className="text-center">Pts</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {tournament.players
+                                                                .filter(p => p.groupId === group.id)
+                                                                .sort((a, b) => (b.groupPoints || 0) - (a.groupPoints || 0))
+                                                                .map((player, idx) => (
+                                                                    <tr key={player.id} className={idx < 2 ? 'table-success' : ''}>
+                                                                        <td className="fw-bold">{idx + 1}</td>
+                                                                        <td>
+                                                                            <div className="d-flex align-items-center gap-2">
+                                                                                <PlayerAvatar player={player} size={28} />
+                                                                                <span>{player.name}</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="text-center">{player.groupWins || 0}</td>
+                                                                        <td className="text-center">{player.groupLosses || 0}</td>
+                                                                        <td className="text-center fw-bold">{player.groupPoints || 0}</td>
+                                                                    </tr>
+                                                                ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                {/* Matchs du groupe */}
+                                                <div className="card-footer bg-light">
+                                                    <small className="text-muted d-block mb-2">Matchs</small>
+                                                    {getGroupMatches(group.id).map(match => (
+                                                        <div key={match.id} className="d-flex align-items-center justify-content-between py-1 border-bottom">
+                                                            <div className="d-flex align-items-center gap-2">
+                                                                <PlayerAvatar player={match.player1} size={24} />
+                                                                <small className={match.winner?.id === match.player1?.id ? 'fw-bold text-success' : ''}>
+                                                                    {match.player1?.name}
+                                                                </small>
+                                                            </div>
+                                                            <span className="badge bg-dark">
+                                                                {match.score1 ?? '-'} : {match.score2 ?? '-'}
+                                                            </span>
+                                                            <div className="d-flex align-items-center gap-2">
+                                                                <small className={match.winner?.id === match.player2?.id ? 'fw-bold text-success' : ''}>
+                                                                    {match.player2?.name}
+                                                                </small>
+                                                                <PlayerAvatar player={match.player2} size={24} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Participants */}
+                    <div className="card shadow-sm mb-4">
+                        <div className="card-header bg-dark text-white">
+                            <h5 className="mb-0"><i className="bi bi-people me-2"></i>Participants ({tournament.players.length})</h5>
+                        </div>
+                        <div className="card-body">
+                            <div className="row g-2">
+                                {tournament.players.map(player => {
+                                    const isWinner = tournament.winner?.id === player.id;
+                                    const isSecond = tournament.secondPlace?.id === player.id;
+                                    const isThird = tournament.thirdPlace?.id === player.id;
+
+                                    return (
+                                        <div key={player.id} className="col-6 col-md-3">
+                                            <div className={`d-flex align-items-center gap-2 p-2 rounded border ${isWinner ? 'border-warning bg-warning bg-opacity-25' :
+                                                    isSecond ? 'border-secondary bg-secondary bg-opacity-10' :
+                                                        isThird ? 'border-warning bg-warning bg-opacity-10' : ''
+                                                }`}>
+                                                <PlayerAvatar player={player} size={32} />
+                                                <span className="text-truncate small fw-medium flex-grow-1">{player.name}</span>
+                                                {isWinner && '👑'}
+                                                {isSecond && '🥈'}
+                                                {isThird && '🥉'}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
-                )}
 
-                {/* Footer */}
-                <div className="text-center py-4">
-                    <p className="text-sm font-bold opacity-70">
-                        🔄 Cette page se met à jour automatiquement
-                    </p>
-                    <a href="/" className="neo-btn bg-white inline-block mt-4 text-sm">
-                        🏠 ACCUEIL TOILESCOINS
-                    </a>
+                    {/* Footer */}
+                    <div className="text-center py-4">
+                        <p className="text-muted small mb-3">
+                            <span className="badge bg-success me-2">●</span>
+                            Mise à jour automatique en temps réel
+                        </p>
+                        <a href="/" className="btn btn-dark btn-lg">
+                            <i className="bi bi-house me-2"></i>Accueil ToilesCoins
+                        </a>
+                    </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
