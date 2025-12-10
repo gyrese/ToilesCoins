@@ -465,143 +465,128 @@ function TournamentContent() {
         return matches;
     };
 
-    // Generate elimination bracket with proper seeding
+    // Generate elimination bracket with proper slot-based propagation
     const generateEliminationBracket = (players: Player[]): Match[] => {
         const playerCount = players.length;
+        if (playerCount < 2) return [];
+
+        // Calculate bracket size (next power of 2)
         const bracketSize = Math.pow(2, Math.ceil(Math.log2(playerCount)));
-        const numByes = bracketSize - playerCount;
+        const totalRounds = Math.log2(bracketSize);
 
-        // Shuffle and assign seeds
-        const shuffledPlayers = [...players]
-            .sort(() => Math.random() - 0.5)
-            .map((p, i) => ({ ...p, seed: i + 1 }));
+        // Shuffle players
+        const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
 
-        // Create bracket positions using standard seeding
-        // For an 8-player bracket: 1v8, 4v5, 3v6, 2v7
-        // This ensures top seeds get byes
-        const getSeedingOrder = (size: number): number[][] => {
-            if (size === 2) return [[1, 2]];
-            const smaller = getSeedingOrder(size / 2);
-            const result: number[][] = [];
-            smaller.forEach(pair => {
-                result.push([pair[0], size + 1 - pair[0]]);
-                result.push([pair[1], size + 1 - pair[1]]);
-            });
-            return result;
-        };
-
-        const seedingOrder = getSeedingOrder(bracketSize);
-
-        // Get player by seed (or undefined for bye)
-        const getPlayerBySeed = (seed: number): Player | undefined => {
-            return shuffledPlayers.find(p => p.seed === seed);
-        };
-
+        // Create all matches for all rounds
         const matches: Match[] = [];
-        let matchId = 0;
+        let globalMatchNumber = 0;
 
-        // Generate first round matches with proper seeding
-        for (let i = 0; i < bracketSize / 2; i++) {
-            const [seed1, seed2] = seedingOrder[i];
-            const player1 = getPlayerBySeed(seed1);
-            const player2 = getPlayerBySeed(seed2);
+        // Track match IDs for linking
+        const matchIdsByRound: string[][] = [];
 
-            const match: Match = {
-                id: `match_${matchId}`,
-                round: 1,
-                matchNumber: i + 1,
-                player1,
-                player2,
-                phase: 'knockout',
-                nextMatchId: `match_${Math.floor(bracketSize / 2) + Math.floor(i / 2)}`
-            };
+        // Generate matches round by round
+        for (let round = 1; round <= totalRounds; round++) {
+            const matchesInRound = bracketSize / Math.pow(2, round);
+            const roundMatches: string[] = [];
 
-            // Handle byes - player with opponent as bye wins automatically
-            if (player1 && !player2) {
-                match.winner = player1;
+            for (let i = 0; i < matchesInRound; i++) {
+                const matchId = `match_${globalMatchNumber}`;
+                roundMatches.push(matchId);
+
+                matches.push({
+                    id: matchId,
+                    round: round,
+                    matchNumber: globalMatchNumber + 1,
+                    phase: 'knockout' as const,
+                });
+
+                globalMatchNumber++;
+            }
+
+            matchIdsByRound.push(roundMatches);
+        }
+
+        // Link matches: match i in round r → match floor(i/2) in round r+1
+        // If i is even → player1, if i is odd → player2
+        for (let round = 0; round < matchIdsByRound.length - 1; round++) {
+            const currentRound = matchIdsByRound[round];
+            const nextRound = matchIdsByRound[round + 1];
+
+            for (let i = 0; i < currentRound.length; i++) {
+                const matchId = currentRound[i];
+                const nextMatchId = nextRound[Math.floor(i / 2)];
+                const match = matches.find(m => m.id === matchId);
+                if (match) {
+                    match.nextMatchId = nextMatchId;
+                }
+            }
+        }
+
+        // Distribute players to first round
+        const firstRoundMatches = matches.filter(m => m.round === 1);
+
+        for (let i = 0; i < firstRoundMatches.length; i++) {
+            const match = firstRoundMatches[i];
+            const p1Idx = i;
+            const p2Idx = firstRoundMatches.length * 2 - 1 - i;
+
+            match.player1 = shuffledPlayers[p1Idx] || undefined;
+            match.player2 = shuffledPlayers[p2Idx] || undefined;
+
+            // Handle bye
+            if (match.player1 && !match.player2) {
+                match.winner = match.player1;
                 match.score1 = 1;
                 match.score2 = 0;
-            } else if (!player1 && player2) {
-                match.winner = player2;
+            } else if (!match.player1 && match.player2) {
+                match.winner = match.player2;
                 match.score1 = 0;
                 match.score2 = 1;
             }
-            // Note: with proper seeding, we should never have bye vs bye
-
-            matches.push(match);
-            matchId++;
         }
 
-        // Generate subsequent rounds
-        let currentRound = 2;
-        let matchesInRound = bracketSize / 4;
+        // Propagate bye winners using correct slots
+        let changed = true;
+        while (changed) {
+            changed = false;
 
-        while (matchesInRound >= 1) {
-            for (let i = 0; i < matchesInRound; i++) {
-                matches.push({
-                    id: `match_${matchId}`,
-                    round: currentRound,
-                    matchNumber: i + 1,
-                    phase: 'knockout',
-                    nextMatchId: matchesInRound > 1 ? `match_${matchId + matchesInRound + Math.floor(i / 2)}` : undefined
-                });
-                matchId++;
-            }
-            currentRound++;
-            matchesInRound = matchesInRound / 2;
-        }
-
-        // Propagate bye winners and handle cascading byes
-        const propagateByeWinners = () => {
-            let changed = true;
-            while (changed) {
-                changed = false;
-
-                // Find all matches with a winner that hasn't been propagated yet
-                const completedMatches = matches.filter(m => m.winner && m.nextMatchId);
-
-                completedMatches.forEach(completedMatch => {
-                    if (!completedMatch.nextMatchId || !completedMatch.winner) return;
-
-                    const nextMatch = matches.find(m => m.id === completedMatch.nextMatchId);
+            matches.forEach(match => {
+                if (match.winner && match.nextMatchId) {
+                    const nextMatch = matches.find(m => m.id === match.nextMatchId);
                     if (!nextMatch) return;
 
-                    // Check if winner needs to be added to next match
-                    const winnerInNextMatch =
-                        nextMatch.player1?.id === completedMatch.winner.id ||
-                        nextMatch.player2?.id === completedMatch.winner.id;
+                    // Find index of this match in its round
+                    const roundMatches = matchIdsByRound[match.round - 1];
+                    const indexInRound = roundMatches.indexOf(match.id);
 
-                    if (!winnerInNextMatch) {
-                        if (!nextMatch.player1) {
-                            nextMatch.player1 = completedMatch.winner;
-                            changed = true;
-                        } else if (!nextMatch.player2) {
-                            nextMatch.player2 = completedMatch.winner;
-                            changed = true;
-                        }
-                    }
-                });
+                    // Even index → player1, odd index → player2
+                    const isEvenIndex = indexInRound % 2 === 0;
 
-                // Check for new auto-wins (one player vs no player)
-                matches.forEach(match => {
-                    if (!match.winner && match.player1 && !match.player2) {
-                        // Player 1 wins by default (bye)
-                        match.winner = match.player1;
-                        match.score1 = 1;
-                        match.score2 = 0;
+                    if (isEvenIndex && nextMatch.player1?.id !== match.winner.id) {
+                        nextMatch.player1 = match.winner;
                         changed = true;
-                    } else if (!match.winner && !match.player1 && match.player2) {
-                        // Player 2 wins by default (bye)
-                        match.winner = match.player2;
-                        match.score1 = 0;
-                        match.score2 = 1;
+                    } else if (!isEvenIndex && nextMatch.player2?.id !== match.winner.id) {
+                        nextMatch.player2 = match.winner;
                         changed = true;
                     }
-                });
-            }
-        };
+                }
+            });
 
-        propagateByeWinners();
+            // Check for new auto-wins
+            matches.forEach(match => {
+                if (!match.winner && match.player1 && !match.player2) {
+                    match.winner = match.player1;
+                    match.score1 = 1;
+                    match.score2 = 0;
+                    changed = true;
+                } else if (!match.winner && !match.player1 && match.player2) {
+                    match.winner = match.player2;
+                    match.score1 = 0;
+                    match.score2 = 1;
+                    changed = true;
+                }
+            });
+        }
 
         return matches;
     };
@@ -748,13 +733,21 @@ function TournamentContent() {
                 // The winner changed, we need to update downstream matches
                 resetMatchCascade(match.nextMatchId, oldWinner.id);
             } else {
-                // First time setting winner, just add to next match
+                // First time setting winner, add to next match
+                // Find index of this match in its round to determine slot
+                const matchesInSameRound = updatedMatches.filter(
+                    m => m.phase === 'knockout' && m.round === match.round
+                ).sort((a, b) => a.matchNumber - b.matchNumber);
+
+                const indexInRound = matchesInSameRound.findIndex(m => m.id === match.id);
+                // Even index → player1, odd index → player2
+                const goesToPlayer1 = indexInRound % 2 === 0;
+
                 updatedMatches = updatedMatches.map(m => {
                     if (m.id === match.nextMatchId) {
-                        // Check if player1 slot is empty or TBD
-                        if (!m.player1 || m.player1.name === 'TBD') {
+                        if (goesToPlayer1) {
                             return { ...m, player1: newWinner };
-                        } else if (!m.player2 || m.player2.name === 'TBD') {
+                        } else {
                             return { ...m, player2: newWinner };
                         }
                     }
@@ -977,6 +970,43 @@ function TournamentContent() {
         }
     };
 
+    // Reset bracket only (keep players)
+    const resetBracket = () => {
+        if (!confirm("⚠️ Réinitialiser le tableau ? Les joueurs seront conservés mais tous les matchs seront supprimés.")) {
+            return;
+        }
+        setTournament({
+            ...tournament,
+            matches: [],
+            groups: [],
+            status: 'setup',
+            winner: undefined,
+            secondPlace: undefined,
+            thirdPlace: undefined
+        });
+        setCurrentView('accueil');
+        setMessage("✅ Tableau réinitialisé ! Vous pouvez regénérer les matchs.");
+    };
+
+    // Reset everything (players + bracket)
+    const resetAll = () => {
+        if (!confirm("⚠️ Tout réinitialiser ? Les joueurs ET les matchs seront supprimés.")) {
+            return;
+        }
+        setTournament({
+            ...tournament,
+            players: [],
+            matches: [],
+            groups: [],
+            status: 'setup',
+            winner: undefined,
+            secondPlace: undefined,
+            thirdPlace: undefined
+        });
+        setCurrentView('players');
+        setMessage("✅ Tournoi entièrement réinitialisé !");
+    };
+
     // Recalculate all scores and stats from matches
     const recalculateAllScores = () => {
         const groupMatches = tournament.matches.filter(m => m.phase === 'group');
@@ -1039,32 +1069,23 @@ function TournamentContent() {
         // Process each knockout match and propagate winner to next match
         knockoutMatches.forEach(match => {
             if (match.winner && match.nextMatchId) {
-                const winnerId = match.winner.id;
                 const winner = match.winner;
+
+                // Find index of this match in its round
+                const matchesInSameRound = knockoutMatches
+                    .filter(m => m.round === match.round)
+                    .sort((a, b) => a.matchNumber - b.matchNumber);
+                const indexInRound = matchesInSameRound.findIndex(m => m.id === match.id);
+
+                // Even index → player1, odd index → player2
+                const goesToPlayer1 = indexInRound % 2 === 0;
 
                 updatedMatches = updatedMatches.map(m => {
                     if (m.id === match.nextMatchId) {
-                        // Determine which slot this winner should go to based on match number
-                        // Even match numbers go to player1, odd go to player2
-                        const isEvenMatch = match.matchNumber % 2 === 0;
-
-                        // Check if winner is already correctly placed
-                        if (m.player1?.id === winnerId || m.player2?.id === winnerId) {
-                            return m;
-                        }
-
-                        // Place winner in the appropriate slot
-                        if (!m.player1 || m.player1.name === 'TBD') {
+                        if (goesToPlayer1) {
                             return { ...m, player1: winner };
-                        } else if (!m.player2 || m.player2.name === 'TBD') {
-                            return { ...m, player2: winner };
                         } else {
-                            // Both slots filled - replace based on match number
-                            if (isEvenMatch) {
-                                return { ...m, player1: winner };
-                            } else {
-                                return { ...m, player2: winner };
-                            }
+                            return { ...m, player2: winner };
                         }
                     }
                     return m;
@@ -1200,14 +1221,32 @@ function TournamentContent() {
                             </button>
                         )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                         {tournament.matches.length > 0 && (
+                            <>
+                                <button
+                                    onClick={recalculateAllScores}
+                                    className="neo-btn text-sm font-black bg-orange-400 text-black hover:bg-orange-300"
+                                    title="Recalculer tous les points et propager les qualifiés"
+                                >
+                                    🔄 RECALCULER
+                                </button>
+                                <button
+                                    onClick={resetBracket}
+                                    className="neo-btn text-sm font-black bg-red-400 text-black hover:bg-red-300"
+                                    title="Réinitialiser le tableau (garder les joueurs)"
+                                >
+                                    🗑️ TABLEAU
+                                </button>
+                            </>
+                        )}
+                        {tournament.players.length > 0 && (
                             <button
-                                onClick={recalculateAllScores}
-                                className="neo-btn text-sm font-black bg-orange-400 text-black hover:bg-orange-300"
-                                title="Recalculer tous les points et propager les qualifiés"
+                                onClick={resetAll}
+                                className="neo-btn text-sm font-black bg-red-600 text-white hover:bg-red-500"
+                                title="Tout réinitialiser (joueurs + tableau)"
                             >
-                                🔄 RECALCULER
+                                ⚠️ TOUT
                             </button>
                         )}
                         <button
