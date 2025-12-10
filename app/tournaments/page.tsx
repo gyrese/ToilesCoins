@@ -957,6 +957,95 @@ function TournamentContent() {
                 });
             }
 
+            // Award badges to winner
+            if (winner.isRegistered && winner.userId) {
+                try {
+                    // Get updated user stats
+                    const userDoc = await getDoc(doc(db, "users", winner.userId));
+                    const userData = userDoc.data();
+
+                    // 1. First victory type badge (if event has typeId)
+                    if (tournament.eventTypeId) {
+                        const eventTypeId = tournament.eventTypeId.toString();
+
+                        // Try with string first
+                        let badgesQuery = await getDocs(query(
+                            collection(db, "badges"),
+                            where("conditionType", "==", "first_victory_type"),
+                            where("conditionValue", "==", eventTypeId)
+                        ));
+
+                        // Fallback to number if no results
+                        if (badgesQuery.empty && !isNaN(Number(eventTypeId))) {
+                            badgesQuery = await getDocs(query(
+                                collection(db, "badges"),
+                                where("conditionType", "==", "first_victory_type"),
+                                where("conditionValue", "==", Number(eventTypeId))
+                            ));
+                        }
+
+                        for (const badgeDoc of badgesQuery.docs) {
+                            const badgeData = badgeDoc.data();
+
+                            // Check if user already has this badge
+                            const userBadgesRef = collection(db, "users", winner.userId, "badges");
+                            const existingBadge = await getDocs(query(userBadgesRef, where("name", "==", badgeData.name)));
+
+                            if (existingBadge.empty) {
+                                await addDoc(userBadgesRef, {
+                                    name: badgeData.name,
+                                    description: badgeData.description,
+                                    icon: badgeData.icon,
+                                    rarity: "rare",
+                                    obtainedAt: serverTimestamp()
+                                });
+                                console.log(`Badge "${badgeData.name}" attribué à ${winner.name}`);
+                            }
+                        }
+                    }
+
+                    // 2. Stats-based badges (wins, balance, events)
+                    const allBadges = await getDocs(collection(db, "badges"));
+
+                    for (const badgeDoc of allBadges.docs) {
+                        const badgeData = badgeDoc.data();
+                        let shouldAward = false;
+
+                        if (badgeData.conditionType === "wins") {
+                            if ((userData?.wins || 0) >= badgeData.conditionValue) {
+                                shouldAward = true;
+                            }
+                        } else if (badgeData.conditionType === "balance") {
+                            if ((userData?.balance || 0) >= badgeData.conditionValue) {
+                                shouldAward = true;
+                            }
+                        } else if (badgeData.conditionType === "events") {
+                            if ((userData?.eventsCount || 0) >= badgeData.conditionValue) {
+                                shouldAward = true;
+                            }
+                        }
+
+                        if (shouldAward) {
+                            const userBadgesRef = collection(db, "users", winner.userId, "badges");
+                            const existingBadge = await getDocs(query(userBadgesRef, where("name", "==", badgeData.name)));
+
+                            if (existingBadge.empty) {
+                                await addDoc(userBadgesRef, {
+                                    name: badgeData.name,
+                                    description: badgeData.description,
+                                    icon: badgeData.icon,
+                                    rarity: badgeData.rarity || "common",
+                                    obtainedAt: serverTimestamp()
+                                });
+                                console.log(`Badge "${badgeData.name}" attribué à ${winner.name}`);
+                            }
+                        }
+                    }
+                } catch (badgeError) {
+                    console.error("Erreur attribution badges:", badgeError);
+                }
+            }
+
             setMessage("✅ Tournoi terminé et résultats enregistrés !");
             setCurrentView('results');
             setTournament({
@@ -972,9 +1061,6 @@ function TournamentContent() {
 
     // Reset bracket only (keep players)
     const resetBracket = () => {
-        if (!confirm("⚠️ Réinitialiser le tableau ? Les joueurs seront conservés mais tous les matchs seront supprimés.")) {
-            return;
-        }
         setTournament({
             ...tournament,
             matches: [],
@@ -990,9 +1076,6 @@ function TournamentContent() {
 
     // Reset everything (players + bracket)
     const resetAll = () => {
-        if (!confirm("⚠️ Tout réinitialiser ? Les joueurs ET les matchs seront supprimés.")) {
-            return;
-        }
         setTournament({
             ...tournament,
             players: [],
@@ -1226,14 +1309,14 @@ function TournamentContent() {
                             <>
                                 <button
                                     onClick={recalculateAllScores}
-                                    className="neo-btn text-sm font-black bg-orange-400 text-black hover:bg-orange-300"
+                                    className="neo-btn text-sm font-black bg-white text-black border-2 border-black hover:bg-gray-100"
                                     title="Recalculer tous les points et propager les qualifiés"
                                 >
                                     🔄 RECALCULER
                                 </button>
                                 <button
                                     onClick={resetBracket}
-                                    className="neo-btn text-sm font-black bg-red-400 text-black hover:bg-red-300"
+                                    className="neo-btn text-sm font-black bg-white text-black border-2 border-black hover:bg-gray-100"
                                     title="Réinitialiser le tableau (garder les joueurs)"
                                 >
                                     🗑️ TABLEAU
@@ -1243,19 +1326,18 @@ function TournamentContent() {
                         {tournament.players.length > 0 && (
                             <button
                                 onClick={resetAll}
-                                className="neo-btn text-sm font-black bg-red-600 text-white hover:bg-red-500"
+                                className="neo-btn text-sm font-black bg-black text-white hover:bg-gray-800"
                                 title="Tout réinitialiser (joueurs + tableau)"
                             >
-                                ⚠️ TOUT
+                                ⚠️ TOUT RESET
                             </button>
                         )}
                         <button
                             onClick={saveTournament}
                             disabled={isSaving}
-                            className={`neo-btn text-sm font-black bg-green-400 text-black hover:bg-green-300 ${isSaving ? 'opacity-50' : ''}`}
+                            className={`neo-btn text-sm font-black bg-white text-black border-2 border-black hover:bg-gray-100 ${isSaving ? 'opacity-50' : ''}`}
                         >
-                            <Save size={14} className="inline mr-1" />
-                            {isSaving ? 'SAUVEGARDE...' : 'SAUVEGARDER'}
+                            💾 {isSaving ? 'SAUVEGARDE...' : 'SAUVEGARDER'}
                         </button>
                     </div>
                 </div>
