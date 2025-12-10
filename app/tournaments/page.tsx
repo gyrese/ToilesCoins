@@ -751,9 +751,10 @@ function TournamentContent() {
                 // First time setting winner, just add to next match
                 updatedMatches = updatedMatches.map(m => {
                     if (m.id === match.nextMatchId) {
-                        if (!m.player1) {
+                        // Check if player1 slot is empty or TBD
+                        if (!m.player1 || m.player1.name === 'TBD') {
                             return { ...m, player1: newWinner };
-                        } else if (!m.player2) {
+                        } else if (!m.player2 || m.player2.name === 'TBD') {
                             return { ...m, player2: newWinner };
                         }
                     }
@@ -1028,30 +1029,42 @@ function TournamentContent() {
         });
 
         // For knockout matches, ensure winners are propagated correctly
-        const knockoutMatches = tournament.matches.filter(m => m.phase === 'knockout');
         let updatedMatches = [...tournament.matches];
 
-        // Sort knockout matches by round to process in order
-        const sortedKnockout = [...knockoutMatches].sort((a, b) => a.round - b.round);
+        // Sort knockout matches by round to process in order (lowest round first)
+        const knockoutMatches = updatedMatches
+            .filter(m => m.phase === 'knockout')
+            .sort((a, b) => a.round - b.round);
 
-        sortedKnockout.forEach(match => {
+        // Process each knockout match and propagate winner to next match
+        knockoutMatches.forEach(match => {
             if (match.winner && match.nextMatchId) {
-                // Ensure winner is in the next match
+                const winnerId = match.winner.id;
+                const winner = match.winner;
+
                 updatedMatches = updatedMatches.map(m => {
                     if (m.id === match.nextMatchId) {
-                        const currentMatch = updatedMatches.find(um => um.id === match.id);
-                        if (!currentMatch?.winner) return m;
+                        // Determine which slot this winner should go to based on match number
+                        // Even match numbers go to player1, odd go to player2
+                        const isEvenMatch = match.matchNumber % 2 === 0;
 
-                        // Check if winner is already in the next match
-                        if (m.player1?.id === currentMatch.winner.id || m.player2?.id === currentMatch.winner.id) {
+                        // Check if winner is already correctly placed
+                        if (m.player1?.id === winnerId || m.player2?.id === winnerId) {
                             return m;
                         }
 
-                        // Add winner to next match
+                        // Place winner in the appropriate slot
                         if (!m.player1 || m.player1.name === 'TBD') {
-                            return { ...m, player1: currentMatch.winner };
+                            return { ...m, player1: winner };
                         } else if (!m.player2 || m.player2.name === 'TBD') {
-                            return { ...m, player2: currentMatch.winner };
+                            return { ...m, player2: winner };
+                        } else {
+                            // Both slots filled - replace based on match number
+                            if (isEvenMatch) {
+                                return { ...m, player1: winner };
+                            } else {
+                                return { ...m, player2: winner };
+                            }
                         }
                     }
                     return m;
@@ -1088,7 +1101,7 @@ function TournamentContent() {
     return (
         <div className="min-h-screen bg-[#FFC845] p-4">
             {/* Header compact */}
-            <div className="max-w-3xl mx-auto mb-6">
+            <div className="max-w-2xl mx-auto mb-6">
                 <button
                     onClick={() => router.push('/admin')}
                     className="neo-btn bg-white text-black mb-4 flex items-center gap-2 text-sm font-bold"
@@ -1156,7 +1169,7 @@ function TournamentContent() {
             </div>
 
             {/* Navigation - Tabs with better contrast */}
-            <div className="max-w-3xl mx-auto mb-6">
+            <div className="max-w-2xl mx-auto mb-6">
                 <div className="flex gap-2 flex-wrap items-center justify-between">
                     <div className="flex gap-2 flex-wrap">
                         <button
@@ -1209,7 +1222,7 @@ function TournamentContent() {
                 </div>
 
                 {/* Content */}
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-2xl mx-auto">
                     {/* ACCUEIL VIEW */}
                     {currentView === 'accueil' && (
                         <div className="space-y-4">

@@ -2232,7 +2232,7 @@ export default function Admin() {
 
                                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
 
-                                    <div className="bg-white border-4 border-black p-6 w-full max-w-md md:max-w-3xl">
+                                    <div className="bg-white border-4 border-black p-6 w-full max-w-md md:max-w-2xl">
 
                                         <h3 className="font-black text-xl mb-4">✏️ MODIFIER L'ÉVÉNEMENT</h3>
 
