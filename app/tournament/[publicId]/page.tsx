@@ -28,6 +28,7 @@ interface Match {
     nextMatchId?: string;
     phase: 'group' | 'knockout';
     groupId?: string;
+    isThirdPlace?: boolean;
 }
 
 interface Group {
@@ -122,11 +123,9 @@ export default function PublicTournament() {
                 >?</div>
             );
         }
-        const avatarUrl = playerAvatars[player.id];
-        const initials = player.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-        const colors = ['bg-primary', 'bg-success', 'bg-info', 'bg-warning', 'bg-danger', 'bg-secondary'];
-        const colorClass = colors[player.name.charCodeAt(0) % colors.length];
 
+        // Registered player with saved avatar
+        const avatarUrl = playerAvatars[player.id];
         if (avatarUrl) {
             return (
                 <img
@@ -137,11 +136,18 @@ export default function PublicTournament() {
                 />
             );
         }
+
+        // For non-registered players or those without avatar, use DiceBear
+        // Generate a consistent avatar based on their name using fun style
+        const diceBearUrl = `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${encodeURIComponent(player.name)}&size=${size}`;
+
         return (
-            <div
-                className={`rounded-circle ${colorClass} d-flex align-items-center justify-content-center text-white fw-bold`}
-                style={{ width: size, height: size, fontSize: size * 0.4 }}
-            >{initials}</div>
+            <img
+                src={diceBearUrl}
+                alt={player.name}
+                className="rounded-circle"
+                style={{ width: size, height: size, objectFit: 'cover', background: '#f0f0f0' }}
+            />
         );
     };
 
@@ -174,7 +180,8 @@ export default function PublicTournament() {
         );
     }
 
-    const knockoutMatches = tournament.matches.filter(m => m.phase === 'knockout');
+    const knockoutMatches = tournament.matches.filter(m => m.phase === 'knockout' && !m.isThirdPlace);
+    const thirdPlaceMatch = tournament.matches.find(m => m.isThirdPlace);
     const totalKnockoutRounds = knockoutMatches.length > 0 ? Math.max(...knockoutMatches.map(m => m.round)) : 0;
     const getMatchesByRound = (round: number) => knockoutMatches.filter(m => m.round === round);
     const getGroupMatches = (groupId: string) => tournament.matches.filter(m => m.phase === 'group' && m.groupId === groupId);
@@ -327,6 +334,51 @@ export default function PublicTournament() {
                                         </div>
                                     </div>
                                 ))}
+
+                                {/* 3rd Place Match */}
+                                {thirdPlaceMatch && (
+                                    <div className="mb-4">
+                                        <h6 className="text-muted text-uppercase mb-3">🥉 Petite Finale (3ème place)</h6>
+                                        <div className="row g-3">
+                                            <div className="col-12 col-md-8 mx-auto">
+                                                <div className="card border-warning border-2" style={{ background: 'linear-gradient(135deg, #f6e6c9 0%, #d9b38c 100%)' }}>
+                                                    <div className="card-body p-0">
+                                                        {/* Player 1 */}
+                                                        <div className={`d-flex align-items-center p-3 ${thirdPlaceMatch.winner?.id === thirdPlaceMatch.player1?.id ? 'bg-warning bg-opacity-25' : ''}`}>
+                                                            <PlayerAvatar player={thirdPlaceMatch.player1} size={40} />
+                                                            <div className="ms-3 flex-grow-1">
+                                                                <span className={`fw-semibold ${thirdPlaceMatch.winner?.id === thirdPlaceMatch.player1?.id ? 'text-success' : ''}`}>
+                                                                    {thirdPlaceMatch.player1?.name || <span className="text-muted">En attente...</span>}
+                                                                </span>
+                                                            </div>
+                                                            <span className={`fs-3 fw-bold ${thirdPlaceMatch.winner?.id === thirdPlaceMatch.player1?.id ? 'text-success' : 'text-muted'}`}>
+                                                                {thirdPlaceMatch.score1 ?? '-'}
+                                                            </span>
+                                                        </div>
+                                                        <hr className="my-0" />
+                                                        {/* Player 2 */}
+                                                        <div className={`d-flex align-items-center p-3 ${thirdPlaceMatch.winner?.id === thirdPlaceMatch.player2?.id ? 'bg-warning bg-opacity-25' : ''}`}>
+                                                            <PlayerAvatar player={thirdPlaceMatch.player2} size={40} />
+                                                            <div className="ms-3 flex-grow-1">
+                                                                <span className={`fw-semibold ${thirdPlaceMatch.winner?.id === thirdPlaceMatch.player2?.id ? 'text-success' : ''}`}>
+                                                                    {thirdPlaceMatch.player2?.name || <span className="text-muted">En attente...</span>}
+                                                                </span>
+                                                            </div>
+                                                            <span className={`fs-3 fw-bold ${thirdPlaceMatch.winner?.id === thirdPlaceMatch.player2?.id ? 'text-success' : 'text-muted'}`}>
+                                                                {thirdPlaceMatch.score2 ?? '-'}
+                                                            </span>
+                                                        </div>
+                                                        {thirdPlaceMatch.winner && (
+                                                            <div className="card-footer text-center bg-warning bg-opacity-50">
+                                                                <span className="fw-bold">🥉 3ème : {thirdPlaceMatch.winner.name}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -424,8 +476,8 @@ export default function PublicTournament() {
                                     return (
                                         <div key={player.id} className="col-6 col-md-3">
                                             <div className={`d-flex align-items-center gap-2 p-2 rounded border ${isWinner ? 'border-warning bg-warning bg-opacity-25' :
-                                                    isSecond ? 'border-secondary bg-secondary bg-opacity-10' :
-                                                        isThird ? 'border-warning bg-warning bg-opacity-10' : ''
+                                                isSecond ? 'border-secondary bg-secondary bg-opacity-10' :
+                                                    isThird ? 'border-warning bg-warning bg-opacity-10' : ''
                                                 }`}>
                                                 <PlayerAvatar player={player} size={32} />
                                                 <span className="text-truncate small fw-medium flex-grow-1">{player.name}</span>

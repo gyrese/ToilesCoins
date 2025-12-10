@@ -46,7 +46,7 @@
 - [x] Distribution ToilesCoins automatique :
   - 🥇 1er : 500 TC
   - 🥈 2ème : 300 TC  
-  - 🥉 3ème : 150 TC
+  - 🥉 3ème : 50 TC
 - [x] Transaction enregistrée dans l'historique
 - [x] Incrémentation des stats (wins, eventsCount)
 - [x] Attribution automatique des badges :
@@ -65,7 +65,7 @@
 ## 🔄 Améliorations Futures Possibles
 
 ### Priorité Haute
-- [ ] Affichage visuel du bracket en arbre (style tournoi classique)
+- [x] Affichage visuel du bracket en arbre (style tournoi classique) ✅ FAIT
 - [ ] Petite finale (match pour la 3ème place)
 - [ ] Mode spectateur temps réel amélioré avec animations
 - [ ] Notifications push quand un match est terminé

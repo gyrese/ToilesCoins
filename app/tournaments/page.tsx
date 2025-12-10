@@ -43,6 +43,7 @@ interface Match {
     nextMatchId?: string;
     phase: 'group' | 'knockout';
     groupId?: string;
+    isThirdPlace?: boolean; // Match pour la 3ème place
 }
 
 interface Group {
@@ -588,6 +589,26 @@ function TournamentContent() {
             });
         }
 
+        // Add 3rd place match (petite finale) if there are at least 2 rounds
+        if (totalRounds >= 2) {
+            const finalMatch = matches.find(m => !m.nextMatchId && !m.isThirdPlace);
+            if (finalMatch) {
+                // Find semi-finals (matches that lead to the final)
+                const semiFinals = matches.filter(m => m.nextMatchId === finalMatch.id);
+
+                if (semiFinals.length === 2) {
+                    matches.push({
+                        id: `match_third_place`,
+                        round: totalRounds, // Same round as final
+                        matchNumber: 999, // Special number for display
+                        phase: 'knockout' as const,
+                        isThirdPlace: true
+                        // players will be filled when semi-finals are completed
+                    });
+                }
+            }
+        }
+
         return matches;
     };
 
@@ -736,7 +757,7 @@ function TournamentContent() {
                 // First time setting winner, add to next match
                 // Find index of this match in its round to determine slot
                 const matchesInSameRound = updatedMatches.filter(
-                    m => m.phase === 'knockout' && m.round === match.round
+                    m => m.phase === 'knockout' && m.round === match.round && !m.isThirdPlace
                 ).sort((a, b) => a.matchNumber - b.matchNumber);
 
                 const indexInRound = matchesInSameRound.findIndex(m => m.id === match.id);
@@ -753,6 +774,29 @@ function TournamentContent() {
                     }
                     return m;
                 });
+
+                // Check if this is a semi-final and send loser to 3rd place match
+                const thirdPlaceMatch = updatedMatches.find(m => m.isThirdPlace);
+                if (thirdPlaceMatch) {
+                    const finalMatch = updatedMatches.find(m => !m.nextMatchId && !m.isThirdPlace);
+                    if (finalMatch && match.nextMatchId === finalMatch.id) {
+                        // This is a semi-final! Send loser to 3rd place match
+                        const loser = match.player1?.id === newWinner.id ? match.player2 : match.player1;
+                        if (loser) {
+                            updatedMatches = updatedMatches.map(m => {
+                                if (m.isThirdPlace) {
+                                    // Use index to determine slot
+                                    if (goesToPlayer1) {
+                                        return { ...m, player1: loser };
+                                    } else {
+                                        return { ...m, player2: loser };
+                                    }
+                                }
+                                return m;
+                            });
+                        }
+                    }
+                }
             }
         }
 
@@ -885,7 +929,8 @@ function TournamentContent() {
     // Complete tournament and save results
     const completeTournament = async () => {
         const knockoutMatches = tournament.matches.filter(m => m.phase === 'knockout');
-        const finalMatch = knockoutMatches.find(m => !m.nextMatchId);
+        const finalMatch = knockoutMatches.find(m => !m.nextMatchId && !m.isThirdPlace);
+        const thirdPlaceMatch = knockoutMatches.find(m => m.isThirdPlace);
 
         if (!finalMatch || !finalMatch.winner) {
             setMessage("❌ Le tournoi n'est pas terminé");
@@ -895,11 +940,15 @@ function TournamentContent() {
         const winner = finalMatch.winner;
         const secondPlace = finalMatch.player1?.id === winner.id ? finalMatch.player2 : finalMatch.player1;
 
-        const semiFinals = knockoutMatches.filter(m => m.nextMatchId === finalMatch.id);
-        const thirdPlaceCandidates = semiFinals
-            .map(m => [m.player1, m.player2].find(p => p?.id !== winner.id && p?.id !== secondPlace?.id))
-            .filter(p => p);
-        const thirdPlace = thirdPlaceCandidates[0];
+        // Use winner of 3rd place match, or fallback to semi-final loser
+        let thirdPlace = thirdPlaceMatch?.winner;
+        if (!thirdPlace) {
+            const semiFinals = knockoutMatches.filter(m => m.nextMatchId === finalMatch.id);
+            const thirdPlaceCandidates = semiFinals
+                .map(m => [m.player1, m.player2].find(p => p?.id !== winner.id && p?.id !== secondPlace?.id))
+                .filter(p => p);
+            thirdPlace = thirdPlaceCandidates[0];
+        }
 
         try {
             const tournamentData = {
@@ -1186,7 +1235,7 @@ function TournamentContent() {
     };
 
     const getMatchesByRound = (round: number) => {
-        return tournament.matches.filter(m => m.round === round && m.phase === 'knockout');
+        return tournament.matches.filter(m => m.round === round && m.phase === 'knockout' && !m.isThirdPlace);
     };
 
     const getGroupMatches = (groupId: string) => {
@@ -1703,8 +1752,8 @@ function TournamentContent() {
 
                                                             {/* Player 1 */}
                                                             <div className={`flex items-center justify-between p-1 mb-1 text-xs border rounded ${match.winner?.id === match.player1?.id
-                                                                    ? 'bg-green-100 border-green-500 font-black'
-                                                                    : 'bg-gray-50 border-gray-200'
+                                                                ? 'bg-green-100 border-green-500 font-black'
+                                                                : 'bg-gray-50 border-gray-200'
                                                                 }`}>
                                                                 <span className="truncate max-w-[80px]" title={match.player1?.name}>
                                                                     {match.player1?.name || 'TBD'}
@@ -1729,8 +1778,8 @@ function TournamentContent() {
 
                                                             {/* Player 2 */}
                                                             <div className={`flex items-center justify-between p-1 mt-1 text-xs border rounded ${match.winner?.id === match.player2?.id
-                                                                    ? 'bg-green-100 border-green-500 font-black'
-                                                                    : 'bg-gray-50 border-gray-200'
+                                                                ? 'bg-green-100 border-green-500 font-black'
+                                                                : 'bg-gray-50 border-gray-200'
                                                                 }`}>
                                                                 <span className="truncate max-w-[80px]" title={match.player2?.name}>
                                                                     {match.player2?.name || 'TBD'}
@@ -1777,6 +1826,71 @@ function TournamentContent() {
                                             <span className="w-3 h-3 bg-gray-50 border border-gray-200 rounded"></span> En attente
                                         </span>
                                     </div>
+
+                                    {/* 3rd Place Match (Petite Finale) */}
+                                    {(() => {
+                                        const thirdPlaceMatch = knockoutMatches.find(m => m.isThirdPlace);
+                                        if (!thirdPlaceMatch) return null;
+
+                                        return (
+                                            <div className="mt-6 p-4 bg-gradient-to-r from-amber-100 to-orange-100 border-2 border-amber-500 rounded">
+                                                <h3 className="text-sm font-black uppercase mb-3 text-amber-700">
+                                                    🥉 Petite Finale (3ème place)
+                                                </h3>
+                                                <div className="flex items-center justify-center gap-4">
+                                                    {/* Player 1 */}
+                                                    <div className={`flex-1 p-2 text-center border-2 rounded ${thirdPlaceMatch.winner?.id === thirdPlaceMatch.player1?.id
+                                                        ? 'bg-amber-200 border-amber-500 font-black'
+                                                        : 'bg-white border-gray-300'
+                                                        }`}>
+                                                        <div className="font-bold text-sm">{thirdPlaceMatch.player1?.name || 'TBD'}</div>
+                                                        {thirdPlaceMatch.player1 && thirdPlaceMatch.player2 && (
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                className="w-10 p-1 border border-black text-center text-sm font-bold rounded mt-1"
+                                                                value={thirdPlaceMatch.score1 ?? ''}
+                                                                onChange={(e) => {
+                                                                    const s1 = parseInt(e.target.value) || 0;
+                                                                    const s2 = thirdPlaceMatch.score2 ?? 0;
+                                                                    updateMatchScore(thirdPlaceMatch.id, s1, s2);
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    <span className="font-black text-lg">VS</span>
+
+                                                    {/* Player 2 */}
+                                                    <div className={`flex-1 p-2 text-center border-2 rounded ${thirdPlaceMatch.winner?.id === thirdPlaceMatch.player2?.id
+                                                        ? 'bg-amber-200 border-amber-500 font-black'
+                                                        : 'bg-white border-gray-300'
+                                                        }`}>
+                                                        <div className="font-bold text-sm">{thirdPlaceMatch.player2?.name || 'TBD'}</div>
+                                                        {thirdPlaceMatch.player1 && thirdPlaceMatch.player2 && (
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                className="w-10 p-1 border border-black text-center text-sm font-bold rounded mt-1"
+                                                                value={thirdPlaceMatch.score2 ?? ''}
+                                                                onChange={(e) => {
+                                                                    const s2 = parseInt(e.target.value) || 0;
+                                                                    const s1 = thirdPlaceMatch.score1 ?? 0;
+                                                                    updateMatchScore(thirdPlaceMatch.id, s1, s2);
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {thirdPlaceMatch.winner && (
+                                                    <div className="text-center mt-2 text-amber-700 font-black">
+                                                        🥉 3ème : {thirdPlaceMatch.winner.name}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
                         </div>
