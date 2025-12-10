@@ -1668,34 +1668,52 @@ function TournamentContent() {
                                 </div>
                             )}
 
-                            {/* Knockout Stage */}
+                            {/* Knockout Stage - Tree Bracket */}
                             {knockoutMatches.length > 0 && (
-                                <div className="neo-card">
+                                <div className="neo-card overflow-x-auto">
                                     <h2 className="text-xl font-black uppercase mb-4">⚔️ Phase Éliminatoire</h2>
 
-                                    <div className="space-y-6">
+                                    {/* Bracket Tree Container */}
+                                    <div className="flex gap-4 min-w-max pb-4">
                                         {Array.from({ length: totalKnockoutRounds }, (_, i) => i + 1).map(round => (
-                                            <div key={round}>
-                                                <h3 className="text-lg font-black uppercase mb-3 bg-black text-white p-2">
+                                            <div key={round} className="flex flex-col justify-around" style={{ minWidth: '180px' }}>
+                                                {/* Round Header */}
+                                                <div className="text-center font-black text-sm uppercase mb-3 bg-black text-white py-1 px-2 rounded">
                                                     {round === totalKnockoutRounds ? '🏆 FINALE' :
-                                                        round === totalKnockoutRounds - 1 ? '🥇 DEMI-FINALES' :
+                                                        round === totalKnockoutRounds - 1 ? '🥇 DEMIS' :
                                                             round === totalKnockoutRounds - 2 ? '🎯 QUARTS' :
-                                                                `ROUND ${round}`}
-                                                </h3>
+                                                                `TOUR ${round}`}
+                                                </div>
 
-                                                <div className="grid gap-3 md:grid-cols-2">
-                                                    {getMatchesByRound(round).map(match => (
-                                                        <div key={match.id} className="p-3 bg-white border-2 border-black">
-                                                            <div className="text-xs text-gray-600 mb-2">Match #{match.matchNumber}</div>
+                                                {/* Matches in this round */}
+                                                <div className="flex flex-col justify-around flex-1 gap-2">
+                                                    {getMatchesByRound(round).map((match, idx) => (
+                                                        <div
+                                                            key={match.id}
+                                                            className="relative bg-white border-2 border-black p-2 rounded"
+                                                            style={{
+                                                                marginTop: round > 1 ? `${Math.pow(2, round - 1) * 10}px` : '0',
+                                                                marginBottom: round > 1 ? `${Math.pow(2, round - 1) * 10}px` : '0'
+                                                            }}
+                                                        >
+                                                            {/* Match number badge */}
+                                                            <div className="absolute -top-2 -left-2 bg-black text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                                                                {match.matchNumber}
+                                                            </div>
 
                                                             {/* Player 1 */}
-                                                            <div className={`flex justify-between items-center p-2 mb-1 border-2 ${match.winner?.id === match.player1?.id ? 'border-green-500 bg-green-50' : 'border-gray-300'}`}>
-                                                                <span className="font-bold text-sm">{match.player1?.name || 'TBD'}</span>
-                                                                {match.player1 && (
+                                                            <div className={`flex items-center justify-between p-1 mb-1 text-xs border rounded ${match.winner?.id === match.player1?.id
+                                                                    ? 'bg-green-100 border-green-500 font-black'
+                                                                    : 'bg-gray-50 border-gray-200'
+                                                                }`}>
+                                                                <span className="truncate max-w-[80px]" title={match.player1?.name}>
+                                                                    {match.player1?.name || 'TBD'}
+                                                                </span>
+                                                                {match.player1 && match.player2 && (
                                                                     <input
                                                                         type="number"
                                                                         min="0"
-                                                                        className="w-12 p-1 border-2 border-black text-center text-sm font-black"
+                                                                        className="w-8 p-0.5 border border-black text-center text-xs font-bold rounded"
                                                                         value={match.score1 ?? ''}
                                                                         onChange={(e) => {
                                                                             const s1 = parseInt(e.target.value) || 0;
@@ -1706,16 +1724,22 @@ function TournamentContent() {
                                                                 )}
                                                             </div>
 
-                                                            <div className="text-center text-xs font-black">VS</div>
+                                                            {/* VS */}
+                                                            <div className="text-center text-[10px] text-gray-400 font-bold">VS</div>
 
                                                             {/* Player 2 */}
-                                                            <div className={`flex justify-between items-center p-2 mt-1 border-2 ${match.winner?.id === match.player2?.id ? 'border-green-500 bg-green-50' : 'border-gray-300'}`}>
-                                                                <span className="font-bold text-sm">{match.player2?.name || 'TBD'}</span>
-                                                                {match.player2 && (
+                                                            <div className={`flex items-center justify-between p-1 mt-1 text-xs border rounded ${match.winner?.id === match.player2?.id
+                                                                    ? 'bg-green-100 border-green-500 font-black'
+                                                                    : 'bg-gray-50 border-gray-200'
+                                                                }`}>
+                                                                <span className="truncate max-w-[80px]" title={match.player2?.name}>
+                                                                    {match.player2?.name || 'TBD'}
+                                                                </span>
+                                                                {match.player1 && match.player2 && (
                                                                     <input
                                                                         type="number"
                                                                         min="0"
-                                                                        className="w-12 p-1 border-2 border-black text-center text-sm font-black"
+                                                                        className="w-8 p-0.5 border border-black text-center text-xs font-bold rounded"
                                                                         value={match.score2 ?? ''}
                                                                         onChange={(e) => {
                                                                             const s2 = parseInt(e.target.value) || 0;
@@ -1726,16 +1750,32 @@ function TournamentContent() {
                                                                 )}
                                                             </div>
 
+                                                            {/* Winner indicator */}
                                                             {match.winner && (
-                                                                <div className="text-center text-xs font-black text-green-600 mt-2">
-                                                                    ✅ {match.winner.name}
+                                                                <div className="text-center text-[10px] text-green-600 font-black mt-1">
+                                                                    ✓ {match.winner.name}
                                                                 </div>
+                                                            )}
+
+                                                            {/* Connection line to next match (right side) */}
+                                                            {match.nextMatchId && (
+                                                                <div className="absolute right-0 top-1/2 w-4 h-0.5 bg-black transform translate-x-full -translate-y-1/2"></div>
                                                             )}
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
                                         ))}
+                                    </div>
+
+                                    {/* Legend */}
+                                    <div className="mt-4 text-xs text-gray-500 flex gap-4 items-center border-t pt-2">
+                                        <span className="flex items-center gap-1">
+                                            <span className="w-3 h-3 bg-green-100 border border-green-500 rounded"></span> Vainqueur
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <span className="w-3 h-3 bg-gray-50 border border-gray-200 rounded"></span> En attente
+                                        </span>
                                     </div>
                                 </div>
                             )}
