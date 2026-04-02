@@ -36,6 +36,7 @@ export default function Shop() {
     const [message, setMessage] = useState("");
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [remaining, setRemaining] = useState<number>(0);
+    const [isPurchasing, setIsPurchasing] = useState(false);
 
     // --- AUTH CHECK ---
     useEffect(() => {
@@ -140,7 +141,7 @@ export default function Shop() {
 
     // --- PURCHASE HANDLER ---
     const handlePurchase = async (reward: Reward) => {
-        if (!user || !userData) return;
+        if (!user || !userData || isPurchasing) return;
 
         if (userData.balance < reward.cost) {
             setMessage("Solde insuffisant");
@@ -148,12 +149,17 @@ export default function Shop() {
             return;
         }
 
+        setIsPurchasing(true);
         try {
             await updateDoc(doc(db, "users", user.uid), {
                 balance: increment(-reward.cost),
             });
 
-            const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+            // Génération cryptographiquement sûre du code coupon
+            const array = new Uint8Array(6);
+            crypto.getRandomValues(array);
+            const code = Array.from(array, b => b.toString(36)).join('').toUpperCase().substring(0, 8);
+
             const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
             await addDoc(collection(db, "coupons"), {
                 userId: user.uid,
@@ -170,10 +176,12 @@ export default function Shop() {
             setSelectedReward(null);
             setMessage(`${reward.name} acheté avec succès !`);
             setTimeout(() => setMessage(""), 3000);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Erreur achat:", error);
             setMessage("Erreur lors de l'achat");
             setTimeout(() => setMessage(""), 5000);
+        } finally {
+            setIsPurchasing(false);
         }
     };
 
@@ -283,11 +291,10 @@ export default function Shop() {
                                                             e.stopPropagation();
                                                             handlePurchase(reward);
                                                         }}
-                                                        disabled={!userData || userData.balance < reward.cost}
-                                                        className={`btn btn-dark w-100 fw-bold text-uppercase rounded-3 mt-3 d-flex align-items-center justify-content-center gap-2 ${!userData || userData.balance < reward.cost ? "disabled opacity-50" : ""
-                                                            }`}
+                                                        disabled={!userData || userData.balance < reward.cost || isPurchasing}
+                                                        className={`btn btn-dark w-100 fw-bold text-uppercase rounded-3 mt-3 d-flex align-items-center justify-content-center gap-2 ${!userData || userData.balance < reward.cost || isPurchasing ? "disabled opacity-50" : ""}`}
                                                     >
-                                                        Acheter
+                                                        {isPurchasing ? "En cours..." : "Acheter"}
                                                         <span className="d-inline-block rounded-circle bg-warning border border-warning-subtle" style={{ width: "12px", height: "12px" }}></span>
                                                     </button>
                                                 </div>

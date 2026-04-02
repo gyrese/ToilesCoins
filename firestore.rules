@@ -1,49 +1,74 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Permettre l'accès en lecture/écriture pour le développement
-    // ⚠️ ATTENTION: Ces règles sont permissives pour le développement
-    // Modifiez-les pour la production !
-    
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // Utilitaire : vérifie que l'utilisateur est admin dans Firestore
+    function isAdmin() {
+      return request.auth != null &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "ADMIN";
     }
-    
-    // Note: Les règles spécifiques ci-dessous sont redondantes avec la règle générale
-    // mais sont conservées pour documentation
-    
-    // Règles pour les récompenses (tout le monde peut lire, seul l'admin peut écrire)
-    // La règle générale ci-dessus permet déjà cela
+
+    // Utilisateurs : chaque user lit/modifie uniquement son propre profil
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId &&
+                       request.resource.data.role == resource.data.role; // le rôle ne peut pas être changé par l'user
+      allow delete: if false;
+
+      // Sous-collection badges de l'utilisateur
+      match /badges/{badgeId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if isAdmin();
+      }
+    }
+
+    // Récompenses : lecture pour les users connectés, écriture admin seulement
     match /rewards/{rewardId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
-    
-    // Règles pour les événements
+
+    // Événements : lecture publique, écriture admin seulement
     match /events/{eventId} {
       allow read: if true;
-      allow write: if request.auth != null && 
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "ADMIN";
+      allow write: if isAdmin();
     }
-    
-    
-    // Règles pour les coupons
+
+    // Types d'événements : lecture pour les users connectés, écriture admin
+    match /eventTypes/{typeId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Tournois : lecture pour les users connectés, écriture admin
+    match /tournaments/{tournamentId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Coupons : propriétaire uniquement
     match /coupons/{couponId} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      // Permettre la mise à jour du statut uniquement
-      allow update: if request.auth != null && 
+      allow update: if request.auth != null &&
                        resource.data.userId == request.auth.uid &&
                        request.resource.data.keys().hasOnly(['userId', 'rewardId', 'rewardName', 'rewardIcon', 'rewardDescription', 'code', 'status', 'expiresAt', 'createdAt']) &&
                        request.resource.data.status in ['active', 'expired', 'used'];
       allow delete: if false;
     }
-    
-    // Règles pour les badges
+
+    // Badges (catalogue global) : lecture publique, écriture admin seulement
     match /badges/{badgeId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Transactions (audit log) : lecture admin, création par user connecté sur son propre uid
+    match /transactions/{transactionId} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }

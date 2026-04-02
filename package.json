@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "badges:webp": "node scripts/convert-to-webp.mjs",
+    "badges:webp:replace": "node scripts/convert-to-webp.mjs --delete-originals"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

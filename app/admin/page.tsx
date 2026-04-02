@@ -1,20 +1,63 @@
 "use client";
 
-
-
 import { useEffect, useState } from "react";
-
 import { useRouter } from "next/navigation";
-
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, increment, serverTimestamp, deleteDoc } from "firebase/firestore";
-
 import { db } from "../lib/firebase";
-
 import { useAuth } from "../contexts/AuthContext";
-
 import Navbar from "../components/Navbar";
-
 import Header from "../components/Header";
+
+// --- TYPES ---
+interface Reward {
+    id: string;
+    name: string;
+    cost: number;
+    icon: string;
+    description: string;
+    imageUrl?: string;
+}
+
+interface Badge {
+    id: string;
+    name: string;
+    icon: string;
+    description: string;
+    conditionType: 'wins' | 'balance' | 'events' | 'first_victory_type';
+    conditionValue: number;
+    rarity?: string;
+}
+
+interface EventType {
+    id: string;
+    name: string;
+    icon: string;
+    emoji: string;
+    color?: string;
+}
+
+interface Event {
+    id: string;
+    name: string;
+    description?: string;
+    date: { toDate?: () => Date } | string;
+    place?: string;
+    imageUrl?: string;
+    link?: string;
+    winner?: string;
+    secondPlace?: string;
+    winnerPoints?: number;
+    secondPlacePoints?: number;
+    eventType?: { name: string; emoji: string; icon: string };
+    typeId?: string;
+}
+
+interface FacebookEvent {
+    id: string;
+    name: string;
+    start_time?: string;
+    description?: string;
+}
 
 
 
@@ -52,9 +95,9 @@ export default function Admin() {
 
     // Rewards Management State
 
-    const [rewards, setRewards] = useState<any[]>([]);
+    const [rewards, setRewards] = useState<Reward[]>([]);
 
-    const [editingReward, setEditingReward] = useState<any>(null);
+    const [editingReward, setEditingReward] = useState<Reward | null>(null);
 
     const [rewardForm, setRewardForm] = useState({
 
@@ -74,9 +117,9 @@ export default function Admin() {
 
     // Badges Management State
 
-    const [badges, setBadges] = useState<any[]>([]);
+    const [badges, setBadges] = useState<Badge[]>([]);
 
-    const [editingBadge, setEditingBadge] = useState<any>(null);
+    const [editingBadge, setEditingBadge] = useState<Badge | null>(null);
 
     const [badgeForm, setBadgeForm] = useState({
 
@@ -96,11 +139,11 @@ export default function Admin() {
 
     // Events Management State (anciennement events)
 
-    const [facebookEvents, setFacebookEvents] = useState<any[]>([]);
+    const [facebookEvents, setFacebookEvents] = useState<FacebookEvent[]>([]);
 
-    const [events, setEvents] = useState<any[]>([]);
+    const [events, setEvents] = useState<Event[]>([]);
 
-    const [eventTypes, setEventTypes] = useState<any[]>([]);
+    const [eventTypes, setEventTypes] = useState<EventType[]>([]);
 
     const [loadingFbEvents, setLoadingFbEvents] = useState(false);
 
@@ -132,7 +175,7 @@ export default function Admin() {
         emoji: ""
 
     });
-    const [editingEventType, setEditingEventType] = useState<any>(null);
+    const [editingEventType, setEditingEventType] = useState<EventType | null>(null);
 
     // Delete confirmation modal state
     const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; eventId: string | null; eventName: string }>({
@@ -163,7 +206,7 @@ export default function Admin() {
 
                 const snapshot = await getDocs(q);
 
-                setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reward)));
 
             } else if (activeTab === "badges") {
 
@@ -171,7 +214,7 @@ export default function Admin() {
 
                 const snapshot = await getDocs(q);
 
-                setBadges(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setBadges(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Badge)));
 
             } else if (activeTab === "events") {
 
@@ -179,7 +222,7 @@ export default function Admin() {
 
                 const snapshot = await getDocs(q);
 
-                const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
 
                 // Trier par date décroissante
 
@@ -196,7 +239,7 @@ export default function Admin() {
                 setEvents(eventsData);
 
                 const typesSnapshot = await getDocs(collection(db, "eventTypes"));
-                const typesData = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const typesData = typesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventType));
                 setEventTypes(typesData);
 
             }
@@ -445,7 +488,7 @@ export default function Admin() {
 
             const snapshot = await getDocs(q);
 
-            setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reward)));
 
         } catch (error) {
 
@@ -557,7 +600,7 @@ export default function Admin() {
 
             const snapshot = await getDocs(q);
 
-            setBadges(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setBadges(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Badge)));
 
         } catch (error) {
 
@@ -627,7 +670,10 @@ export default function Admin() {
 
         try {
 
-            const response = await fetch('/api/facebook-events');
+            const token = await user?.getIdToken();
+            const response = await fetch('/api/facebook-events', {
+                headers: { Authorization: `Bearer ${token}` },
+            });
 
             const data = await response.json();
 
@@ -705,15 +751,15 @@ export default function Admin() {
 
             const snapshot = await getDocs(q);
 
-            const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
 
-            eventsData.sort((a: any, b: any) => {
+            eventsData.sort((a, b) => {
 
-                const dateA = a.date?.toDate?.() || new Date(a.date);
+                const dateA = (a.date as { toDate?: () => Date })?.toDate?.() || new Date(a.date as string);
 
-                const dateB = b.date?.toDate?.() || new Date(b.date);
+                const dateB = (b.date as { toDate?: () => Date })?.toDate?.() || new Date(b.date as string);
 
-                return dateB - dateA;
+                return dateB.getTime() - dateA.getTime();
 
             });
 
@@ -928,15 +974,15 @@ export default function Admin() {
 
             const snapshot = await getDocs(q);
 
-            const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
 
-            eventsData.sort((a: any, b: any) => {
+            eventsData.sort((a, b) => {
 
-                const dateA = a.date?.toDate?.() || new Date(a.date);
+                const dateA = (a.date as { toDate?: () => Date })?.toDate?.() || new Date(a.date as string);
 
-                const dateB = b.date?.toDate?.() || new Date(b.date);
+                const dateB = (b.date as { toDate?: () => Date })?.toDate?.() || new Date(b.date as string);
 
-                return dateB - dateA;
+                return dateB.getTime() - dateA.getTime();
 
             });
 
@@ -1014,8 +1060,10 @@ export default function Admin() {
         const formData = new FormData();
         formData.append("file", file);
 
+        const token = await user?.getIdToken();
         const response = await fetch("/api/admin/upload-image", {
             method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
             body: formData,
         });
 
@@ -1705,7 +1753,7 @@ export default function Admin() {
                                                     {badge.conditionType === 'wins' && `🏆 ${badge.conditionValue} Victoires`}
                                                     {badge.conditionType === 'balance' && `💰 ${badge.conditionValue} TC`}
                                                     {badge.conditionType === 'events' && `📅 ${badge.conditionValue} Événements`}
-                                                    {badge.conditionType === 'first_victory_type' && `🥇 Première Victoire : ${eventTypes.find(t => t.id === badge.conditionValue)?.name || 'Type inconnu'}`}
+                                                    {badge.conditionType === 'first_victory_type' && `🥇 Première Victoire : ${eventTypes.find(t => t.id === String(badge.conditionValue))?.name || 'Type inconnu'}`}
 
                                                 </div>
 
@@ -1996,15 +2044,15 @@ export default function Admin() {
 
                                                 const snapshot = await getDocs(q);
 
-                                                const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                                                const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event));
 
-                                                eventsData.sort((a: any, b: any) => {
+                                                eventsData.sort((a, b) => {
 
-                                                    const dateA = a.date?.toDate?.() || new Date(a.date);
+                                                    const dateA = (a.date as { toDate?: () => Date })?.toDate?.() || new Date(a.date as string);
 
-                                                    const dateB = b.date?.toDate?.() || new Date(b.date);
+                                                    const dateB = (b.date as { toDate?: () => Date })?.toDate?.() || new Date(b.date as string);
 
-                                                    return dateB - dateA;
+                                                    return dateB.getTime() - dateA.getTime();
 
                                                 });
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, User, ShieldAlert, Ticket, Calendar } from "lucide-react";
+import { Home, ShoppingBag, ShieldAlert, Ticket, Calendar } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Navbar() {
@@ -13,7 +13,7 @@ export default function Navbar() {
 
     return (
         <nav className="neo-nav">
-            <Link href="/dashboard" className={`neo-nav-link ${isActive('/dashboard') ? 'active' : ''}`}>
+            <Link href="/profile" className={`neo-nav-link ${isActive('/profile') ? 'active' : ''}`}>
                 <Home size={24} strokeWidth={3} />
             </Link>
 
@@ -27,10 +27,6 @@ export default function Navbar() {
 
             <Link href="/events" className={`neo-nav-link ${isActive('/events') ? 'active' : ''}`}>
                 <Calendar size={24} strokeWidth={3} />
-            </Link>
-
-            <Link href="/profile" className={`neo-nav-link ${isActive('/profile') ? 'active' : ''}`}>
-                <User size={24} strokeWidth={3} />
             </Link>
 
             {userData?.role === "ADMIN" && (
