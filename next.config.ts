@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // output: 'export',  // ⚠️ Décommenter uniquement pour build mobile (désactive les API routes)
+  // output: 'export',  // Décommenter uniquement pour build statique pur (désactive les fonctions serveur)
   images: {
     unoptimized: true,
   },
