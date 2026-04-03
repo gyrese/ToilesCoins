@@ -2,7 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, increment, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { 
+    collection, 
+    query, 
+    where, 
+    getDocs, 
+    getDoc, 
+    addDoc, 
+    doc, 
+    updateDoc, 
+    increment, 
+    serverTimestamp, 
+    deleteDoc 
+} from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import Navbar from "../components/Navbar";
@@ -1660,19 +1672,19 @@ export default function Admin() {
                                             try {
                                                 const typeId = formData.get('eventTypeId');
                                                 const selectedType = eventTypes.find((type) => type.id === typeId);
-                                                const imageUrlInput = ((formData.get('eventImageUrl')) || "").trim();
-                                                const eventLinkInput = ((formData.get('eventLink')) || "").trim();
-                                                const imageFile = formData.get('eventImageFile');
+                                                const imageUrlInput = ((formData.get('eventImageUrl') as string) || "").trim();
+                                                const eventLinkInput = ((formData.get('eventLink') as string) || "").trim();
+                                                const imageFile = formData.get('eventImageFile') as File | null;
                                                 let finalImageUrl = imageUrlInput;
                                                 if (imageFile && imageFile.size > 0) {
                                                     finalImageUrl = await uploadEventImage(imageFile);
                                                 }
                                                 const isTournament = formData.get('isTournament') === 'on';
                                                 const newEventRef = await addDoc(collection(db, "events"), {
-                                                    name: formData.get('eventName'),
-                                                    description: formData.get('eventDesc') || "",
-                                                    date: new Date(formData.get('eventDate')),
-                                                    place: formData.get('eventPlace') || "",
+                                                    name: formData.get('eventName') as string,
+                                                    description: (formData.get('eventDesc') as string) || "",
+                                                    date: new Date(formData.get('eventDate') as string),
+                                                    place: (formData.get('eventPlace') as string) || "",
                                                     typeId: selectedType?.id || null,
                                                     typeName: selectedType?.name || null,
                                                     typeEmoji: selectedType?.emoji || null,
@@ -1687,7 +1699,7 @@ export default function Admin() {
                                                 // Recharger les Événements
                                                 const q = query(collection(db, "events"));
                                                 const snapshot = await getDocs(q);
-                                                const eventsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                                                const eventsData: any[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                                                 eventsData.sort((a, b) => {
                                                     const dateA = (a.date)?.toDate?.() || new Date(a.date);
                                                     const dateB = (b.date)?.toDate?.() || new Date(b.date);
@@ -1702,7 +1714,7 @@ export default function Admin() {
                                                     setEventSubTab("history");
                                                     startEditEvent(newlyCreatedEvent);
                                                 }
-                                            } catch (error) {
+                                            } catch (error: any) {
                                                 console.error('Erreur complète:', error);
                                                 setMessage(`❌ Erreur: ${error.message || 'Erreur inconnue'}`);
                                             }
@@ -1809,11 +1821,11 @@ export default function Admin() {
                                         </div>
                                     ) : (
                                         <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-                                            {events.map((event) => (
+                                            {events.map((event: any) => (
                                                 <div key={event.id} style={{ display: 'flex', flexDirection: 'column', padding: '1rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '10px' }}>
                                                     {(event.imageUrl || event.coverImage) && (
                                                         <div style={{ width: '100%', height: '120px', borderRadius: '8px', overflow: 'hidden', marginBottom: '0.75rem', background: '#000' }}>
-                                                            <img src={event.imageUrl || event.coverImage} alt={event.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target).style.display = 'none'; }} />
+                                                            <img src={event.imageUrl || event.coverImage} alt={event.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as any).style.display = 'none'; }} />
                                                         </div>
                                                     )}
                                                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
