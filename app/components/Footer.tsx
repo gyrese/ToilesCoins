@@ -1,12 +1,18 @@
 "use client";
 
-import React from "react";
-
 export default function Footer() {
     return (
-        <footer className="neo-footer flex flex-col items-center justify-center py-2 border-t-2 border-black bg-[#FFC845] text-center">
-
-            <span className="font-bold text-xs uppercase">Les Toiles Noires</span>
+        <footer style={{
+            textAlign: 'center',
+            padding: '0.75rem',
+            color: 'var(--text-muted)',
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            borderTop: '1px solid var(--border-default)',
+        }}>
+            Les Toiles Noires
         </footer>
     );
 }

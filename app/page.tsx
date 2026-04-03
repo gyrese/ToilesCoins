@@ -16,7 +16,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFC845] text-black">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
         <div className="text-xl font-black uppercase animate-pulse">Chargement...</div>
       </div>
     );

@@ -48,6 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [userData, setUserData] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Nettoyer immédiatement le backgroundColor hérité de l'ancienne version
+    useEffect(() => {
+        document.body.style.removeProperty('background-color');
+        document.body.style.backgroundColor = '';
+    }, []);
+
     useEffect(() => {
         let unsubscribeSnapshot: (() => void) | undefined;
 
@@ -91,13 +97,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    // Appliquer la couleur de thème globalement
+    // Appliquer la couleur d'accent en CSS var (dark mode)
+    // On efface l'ancien inline style backgroundColor si présent
     useEffect(() => {
-        if (userData && userData.themeColor) {
-            document.body.style.backgroundColor = userData.themeColor;
-        } else {
-            document.body.style.backgroundColor = "#FFC845"; // Couleur par défaut
-        }
+        document.body.style.backgroundColor = '';
+        document.body.style.removeProperty('background-color');
+        const color = userData?.themeColor || "#FFC845";
+        document.documentElement.style.setProperty('--accent-gold', color);
     }, [userData]);
 
     const signIn = async (email: string, password: string) => {

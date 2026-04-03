@@ -7,9 +7,8 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import Navbar from "../components/Navbar";
 import Header from "../components/Header";
-import { Archive } from "lucide-react";
+import { ShoppingBag, Coins, Archive, Clock, Ticket } from "lucide-react";
 
-// --- TYPES ---
 interface Reward {
     id: string;
     name: string;
@@ -28,168 +27,113 @@ interface Coupon {
 }
 
 export default function Shop() {
-    // --- STATE & HOOKS ---
     const { user, userData, loading } = useAuth();
     const router = useRouter();
     const [rewards, setRewards] = useState<Reward[]>([]);
     const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
     const [message, setMessage] = useState("");
+    const [messageType, setMessageType] = useState<"success" | "error">("success");
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [remaining, setRemaining] = useState<number>(0);
     const [isPurchasing, setIsPurchasing] = useState(false);
 
-    // --- AUTH CHECK ---
     useEffect(() => {
-        if (!loading && !user) {
-            router.push("/login");
-        }
+        if (!loading && !user) router.push("/login");
     }, [user, loading, router]);
 
-    // --- DATA FETCHING ---
     useEffect(() => {
         const fetchRewards = async () => {
             try {
                 const q = query(collection(db, "rewards"), orderBy("cost", "asc"));
                 const snapshot = await getDocs(q);
-                const rewardsData = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                })) as Reward[];
-                setRewards(rewardsData);
+                setRewards(snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Reward[]);
             } catch (error) {
                 console.error("Erreur chargement récompenses:", error);
             }
         };
-
-        if (user) {
-            fetchRewards();
-        }
+        if (user) fetchRewards();
     }, [user]);
 
-    // --- COUPONS LISTENER ---
     useEffect(() => {
         if (!user || rewards.length === 0) return;
-
-        const q = query(
-            collection(db, "coupons"),
-            where("userId", "==", user.uid),
-            orderBy("createdAt", "desc")
-        );
-
+        const q = query(collection(db, "coupons"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const loadedCoupons: Coupon[] = [];
+            const loaded: Coupon[] = [];
             const now = Date.now();
-
             snapshot.forEach((couponDoc) => {
-                const couponData = couponDoc.data();
-                const reward = rewards.find(r => r.id === couponData.rewardId);
-
+                const d = couponDoc.data();
+                const reward = rewards.find(r => r.id === d.rewardId);
                 if (reward) {
-                    const expiresAt = new Date(couponData.expiresAt);
+                    const expiresAt = new Date(d.expiresAt);
                     const isExpired = expiresAt.getTime() < now;
-
-                    if (isExpired && couponData.status === "active") {
-                        updateDoc(doc(db, "coupons", couponDoc.id), {
-                            status: "expired"
-                        }).catch(err => console.error("Erreur mise à jour:", err));
+                    if (isExpired && d.status === "active") {
+                        updateDoc(doc(db, "coupons", couponDoc.id), { status: "expired" }).catch(console.error);
                     }
-
-                    loadedCoupons.push({
-                        id: couponDoc.id,
-                        code: couponData.code,
-                        reward,
-                        expiresAt,
-                        status: isExpired ? "expired" : (couponData.status || "active")
-                    });
+                    loaded.push({ id: couponDoc.id, code: d.code, reward, expiresAt, status: isExpired ? "expired" : (d.status || "active") });
                 }
             });
-
-            setCoupons(loadedCoupons);
-
-            const activeCoupon = loadedCoupons.find(c => c.status === "active");
-            if (activeCoupon) {
-                const secondsRemaining = Math.floor((activeCoupon.expiresAt.getTime() - now) / 1000);
-                setRemaining(Math.max(0, secondsRemaining));
+            setCoupons(loaded);
+            const active = loaded.find(c => c.status === "active");
+            if (active) {
+                setRemaining(Math.max(0, Math.floor((active.expiresAt.getTime() - now) / 1000)));
             }
-        }, (error) => {
-            console.error("Erreur chargement coupons:", error);
         });
-
         return () => unsubscribe();
     }, [user, rewards]);
 
-    // --- COUNTDOWN ---
     useEffect(() => {
-        const activeCoupon = coupons.find(c => c.status === "active");
-        if (!activeCoupon) return;
-
+        const active = coupons.find(c => c.status === "active");
+        if (!active) return;
         const interval = setInterval(async () => {
-            setRemaining((prev) => {
+            setRemaining(prev => {
                 if (prev <= 1) {
                     clearInterval(interval);
-                    updateDoc(doc(db, "coupons", activeCoupon.id), {
-                        status: "expired"
-                    }).catch(err => console.error("Erreur mise à jour statut:", err));
+                    updateDoc(doc(db, "coupons", active.id), { status: "expired" }).catch(console.error);
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
-
         return () => clearInterval(interval);
     }, [coupons]);
 
-    // --- PURCHASE HANDLER ---
     const handlePurchase = async (reward: Reward) => {
         if (!user || !userData || isPurchasing) return;
-
         if (userData.balance < reward.cost) {
             setMessage("Solde insuffisant");
+            setMessageType("error");
             setTimeout(() => setMessage(""), 3000);
             return;
         }
-
         setIsPurchasing(true);
         try {
-            await updateDoc(doc(db, "users", user.uid), {
-                balance: increment(-reward.cost),
-            });
-
-            // Génération cryptographiquement sûre du code coupon
+            await updateDoc(doc(db, "users", user.uid), { balance: increment(-reward.cost) });
             const array = new Uint8Array(6);
             crypto.getRandomValues(array);
             const code = Array.from(array, b => b.toString(36)).join('').toUpperCase().substring(0, 8);
-
             const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
             await addDoc(collection(db, "coupons"), {
-                userId: user.uid,
-                rewardId: reward.id,
-                rewardName: reward.name,
-                rewardIcon: reward.icon,
-                rewardDescription: reward.description,
-                code,
-                status: "active",
-                expiresAt: expiresAt.toISOString(),
-                createdAt: new Date().toISOString(),
+                userId: user.uid, rewardId: reward.id, rewardName: reward.name,
+                rewardIcon: reward.icon, rewardDescription: reward.description,
+                code, status: "active", expiresAt: expiresAt.toISOString(), createdAt: new Date().toISOString(),
             });
-
             setSelectedReward(null);
-            setMessage(`${reward.name} acheté avec succès !`);
+            setMessage(`${reward.name} acheté !`);
+            setMessageType("success");
             setTimeout(() => setMessage(""), 3000);
-        } catch (error: unknown) {
-            console.error("Erreur achat:", error);
+        } catch (error) {
             setMessage("Erreur lors de l'achat");
+            setMessageType("error");
             setTimeout(() => setMessage(""), 5000);
         } finally {
             setIsPurchasing(false);
         }
     };
 
-    // --- LOADING STATE ---
     if (loading || (user && !userData)) {
         return (
-            <div className="d-flex min-vh-100 align-items-center justify-content-center" style={{ backgroundColor: "#FFD95A" }}>
-                <div className="h3 fw-bold text-uppercase">Chargement...</div>
+            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
+                <div className="skeleton skeleton-card" style={{ width: '200px', height: '40px' }} />
             </div>
         );
     }
@@ -202,163 +146,179 @@ export default function Shop() {
     return (
         <>
             <Header />
-            <main style={{ backgroundColor: "#FFD95A", minHeight: "100vh", paddingBottom: "150px", paddingTop: "50px" }}>
+            <main className="layout-container">
 
-                {/* PAGE HEADER */}
-                <div className="container text-center mb-5">
-                    <h1 className="display-4 fw-bold fst-italic text-uppercase mb-3" style={{ letterSpacing: "-2px" }}>Boutique</h1>
-                    <div className="mx-auto mb-4" style={{ height: "4px", width: "100px", backgroundColor: "black" }}></div>
-                    <p className="fw-bold text-uppercase small" style={{ letterSpacing: "0.2em", opacity: 0.6 }}>
+                {/* Titre */}
+                <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                    <h1 className="font-payback" style={{ fontSize: '2rem', color: 'var(--accent-gold)', margin: 0, letterSpacing: '0.04em' }}>
+                        Boutique
+                    </h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '0.35rem' }}>
                         Échangez vos ToilesCoins
                     </p>
                 </div>
 
-                {/* FEEDBACK MESSAGE */}
+                {/* Toast message */}
                 {message && (
-                    <div className="position-fixed top-0 start-50 translate-middle-x mt-5 z-3">
-                        <div className="alert alert-dark fw-bold text-uppercase shadow-lg rounded-pill px-5">
+                    <div style={{ position: 'fixed', top: 'calc(var(--header-height) + 0.75rem)', left: '50%', transform: 'translateX(-50%)', zIndex: 300, minWidth: '260px' }}>
+                        <div className={message.includes("Erreur") || message.includes("insuffisant") ? "toast toast-error" : "toast toast-success"}>
                             {message}
                         </div>
                     </div>
                 )}
 
-                {/* --- REWARDS GRID (BOOTSTRAP) --- */}
-                <div className="container mb-5">
-                    {/* ROW with G-5 for large gap */}
-                    <div className="row g-5 justify-content-center">
+                {/* Grille récompenses */}
+                {rewards.length === 0 ? (
+                    <div className="dark-card text-center" style={{ padding: '3rem 1.5rem' }}>
+                        <ShoppingBag size={40} style={{ color: 'var(--text-muted)', margin: '0 auto 1rem' }} />
+                        <p style={{ color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Stock épuisé...</p>
+                    </div>
+                ) : (
+                    <div className="shop-grid mb-4">
+                        {rewards.map((reward) => (
+                            <div
+                                key={reward.id}
+                                onClick={() => setSelectedReward(reward)}
+                                style={{
+                                    width: '100%',
+                                    maxWidth: '320px',
+                                    cursor: 'pointer',
+                                    position: 'relative',
+                                }}
+                            >
+                                {/* Ombre décalée néo-brutal */}
+                                <div style={{
+                                    position: 'absolute', top: '8px', left: '8px',
+                                    width: '100%', height: '100%',
+                                    background: 'var(--accent-gold)',
+                                    borderRadius: 'var(--radius-xl)',
+                                    zIndex: 0,
+                                }} />
 
-                        {rewards.length === 0 ? (
-                            <div className="col-12 text-center">
-                                <div className="card border-4 border-dark rounded-4 p-5 shadow-sm">
-                                    <h2 className="text-muted text-uppercase fw-bold">Stock épuisé...</h2>
-                                </div>
-                            </div>
-                        ) : (
-                            rewards.map((reward) => (
-                                // COLUMNS: 1 on mobile (col-12), 2 on tablet (col-md-6), 3 on desktop (col-lg-4)
-                                <div key={reward.id} className="col-12 col-md-6 col-lg-4 d-flex justify-content-center">
-
-                                    {/* CARD CONTAINER */}
-                                    <div
-                                        onClick={() => setSelectedReward(reward)}
-                                        className="card border-0 bg-transparent"
-                                        style={{ width: "100%", maxWidth: "350px", cursor: "pointer" }}
-                                    >
-                                        {/* Custom Card Design mimicking the Trading Card style but using Bootstrap structure */}
-                                        <div className="position-relative">
-                                            {/* Shadow element */}
-                                            <div className="position-absolute w-100 h-100 bg-black rounded-top-5 rounded-bottom-3"
-                                                style={{ top: "10px", left: "10px", zIndex: 0 }}></div>
-
-                                            {/* Main Card Content */}
-                                            <div className="position-relative bg-white border border-4 border-dark rounded-top-5 rounded-bottom-3 overflow-hidden d-flex flex-column"
-                                                style={{ zIndex: 1, height: "500px" }}>
-
-                                                {/* Image Section (Top 55%) */}
-                                                <div className="position-relative border-bottom border-4 border-dark bg-light" style={{ height: "55%" }}>
-                                                    {reward.imageUrl ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img
-                                                            src={reward.imageUrl}
-                                                            alt={reward.name}
-                                                            className="w-100 h-100 object-fit-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-100 h-100 d-flex align-items-center justify-content-center text-secondary display-1">
-                                                            {reward.icon}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Price Badge */}
-                                                    <div className="position-absolute bottom-0 end-0 bg-black text-warning px-3 py-1 fw-bold border-top border-start border-4 border-dark rounded-top-left-3"
-                                                        style={{ borderTopLeftRadius: "10px" }}>
-                                                        <span className="h5 mb-0">{reward.cost} TC</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Content Section (Bottom 45%) */}
-                                                <div className="p-4 d-flex flex-column align-items-center text-center h-100" style={{ backgroundColor: "#FFD95A", height: "45%" }}>
-                                                    <h3 className="h4 fw-bold text-uppercase mb-2 text-dark" style={{ transform: "rotate(-1deg)" }}>
-                                                        {reward.name}
-                                                    </h3>
-
-                                                    <p className="small fw-bold fst-italic text-dark mb-auto px-2" style={{ opacity: 0.8 }}>
-                                                        {reward.description}
-                                                    </p>
-
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handlePurchase(reward);
-                                                        }}
-                                                        disabled={!userData || userData.balance < reward.cost || isPurchasing}
-                                                        className={`btn btn-dark w-100 fw-bold text-uppercase rounded-3 mt-3 d-flex align-items-center justify-content-center gap-2 ${!userData || userData.balance < reward.cost || isPurchasing ? "disabled opacity-50" : ""}`}
-                                                    >
-                                                        {isPurchasing ? "En cours..." : "Acheter"}
-                                                        <span className="d-inline-block rounded-circle bg-warning border border-warning-subtle" style={{ width: "12px", height: "12px" }}></span>
-                                                    </button>
-                                                </div>
+                                <div style={{
+                                    position: 'relative', zIndex: 1,
+                                    background: 'var(--bg-surface)',
+                                    border: '2px solid var(--accent-gold)',
+                                    borderRadius: 'var(--radius-xl)',
+                                    overflow: 'hidden',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    height: '420px',
+                                    transition: 'transform var(--transition-fast)',
+                                }}
+                                    onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.transform = 'translate(-3px,-3px)'}
+                                    onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.transform = 'translate(0,0)'}
+                                >
+                                    {/* Image */}
+                                    <div style={{ height: '55%', position: 'relative', background: 'var(--bg-elevated)', borderBottom: '2px solid var(--accent-gold)' }}>
+                                        {reward.imageUrl ? (
+                                            <img src={reward.imageUrl} alt={reward.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3.5rem' }}>
+                                                {reward.icon}
                                             </div>
+                                        )}
+                                        {/* Badge prix */}
+                                        <div style={{
+                                            position: 'absolute', bottom: 0, right: 0,
+                                            background: 'var(--bg-base)',
+                                            color: 'var(--accent-gold)',
+                                            borderTop: '2px solid var(--accent-gold)',
+                                            borderLeft: '2px solid var(--accent-gold)',
+                                            borderTopLeftRadius: 'var(--radius-md)',
+                                            padding: '4px 12px',
+                                            fontFamily: 'var(--font-display)',
+                                            fontSize: '1rem',
+                                            fontWeight: 800,
+                                        }}>
+                                            {reward.cost} TC
                                         </div>
                                     </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
 
-                {/* --- ACTIVE COUPON MODAL --- */}
-                {activeCoupon && (
-                    <div className="position-fixed bottom-0 start-50 translate-middle-x mb-4 z-3 w-100" style={{ maxWidth: "450px" }}>
-                        <div className="card border-4 border-dark shadow-lg rounded-4 overflow-hidden">
-                            <div className="card-header bg-black text-warning text-center fw-bold text-uppercase small py-2">
-                                Coupon Actif
-                            </div>
-                            <div className="card-body d-flex align-items-center gap-3 p-4 bg-white">
-                                <div className="bg-light border border-2 border-dark rounded-3 p-3 display-6 d-flex align-items-center justify-content-center" style={{ width: "70px", height: "70px" }}>
-                                    {activeCoupon.reward.icon}
-                                </div>
-                                <div className="flex-grow-1">
-                                    <h5 className="fw-bold text-uppercase mb-1 lh-1">{activeCoupon.reward.name}</h5>
-                                    <span className="badge bg-warning text-dark border border-dark fs-6 font-monospace">
-                                        {activeCoupon.code}
-                                    </span>
-                                </div>
-                                <div className="text-end">
-                                    <div className="small fw-bold text-muted text-uppercase" style={{ fontSize: "0.7rem" }}>Expire dans</div>
-                                    <div className="h3 fw-bold text-danger mb-0 font-monospace">
-                                        {Math.floor(remaining / 60)}:{(remaining % 60).toString().padStart(2, '0')}
+                                    {/* Contenu */}
+                                    <div style={{ flex: 1, padding: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                                        <h3 style={{
+                                            fontFamily: 'var(--font-display)',
+                                            fontSize: '1.05rem',
+                                            color: 'var(--text-primary)',
+                                            textTransform: 'uppercase',
+                                            margin: '0 0 0.5rem',
+                                        }}>
+                                            {reward.name}
+                                        </h3>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', flex: 1, lineHeight: 1.4 }}>
+                                            {reward.description}
+                                        </p>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handlePurchase(reward); }}
+                                            disabled={!userData || userData.balance < reward.cost || isPurchasing}
+                                            className="btn-primary"
+                                            style={{ width: '100%', marginTop: '0.75rem' }}
+                                        >
+                                            <Coins size={15} />
+                                            {isPurchasing ? "En cours..." : `Acheter · ${reward.cost} TC`}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        ))}
                     </div>
                 )}
 
-                {/* --- HISTORY SECTION --- */}
+                {/* Historique expiré */}
                 {expiredCoupons.length > 0 && (
-                    <div className="container mt-5 pt-5 border-top border-dark border-opacity-25">
-                        <div className="d-flex align-items-center justify-content-center gap-2 mb-4 opacity-50">
-                            <Archive size={24} />
-                            <h2 className="h4 fw-bold text-uppercase mb-0">Historique des achats</h2>
+                    <div className="dark-card" style={{ marginTop: '1.5rem' }}>
+                        <div className="section-title">
+                            <Archive size={15} />
+                            Historique des achats
                         </div>
-                        <div className="row g-3">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {expiredCoupons.map((coupon) => (
-                                <div key={coupon.id} className="col-12 col-md-6 col-lg-4">
-                                    <div className="card h-100 border-2 border-dark border-opacity-10 bg-white bg-opacity-50 p-3 d-flex flex-row align-items-center gap-3 grayscale opacity-75">
-                                        <div className="fs-3">{coupon.reward.icon}</div>
-                                        <div className="flex-grow-1 text-truncate">
-                                            <div className="fw-bold text-uppercase small text-truncate">{coupon.reward.name}</div>
-                                            <div className="small font-monospace text-muted">{coupon.code}</div>
-                                        </div>
-                                        <span className="badge border border-secondary text-secondary bg-transparent">Expiré</span>
+                                <div key={coupon.id} className="coupon-expired" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                                    <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>{coupon.reward.icon}</span>
+                                    <div className="flex-1 min-w-0">
+                                        <div style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{coupon.reward.name}</div>
+                                        <div style={{ fontFamily: 'monospace', fontSize: '0.7rem', color: 'var(--text-muted)' }}>{coupon.code}</div>
                                     </div>
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>Expiré</span>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
             </main>
+
+            {/* Coupon actif flottant */}
+            {activeCoupon && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: 'calc(var(--navbar-height) + 0.75rem)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 'calc(100% - 2rem)',
+                    maxWidth: '420px',
+                    zIndex: 150,
+                }}>
+                    <div className="coupon-active" style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                        <span style={{ fontSize: '2rem', flexShrink: 0 }}>{activeCoupon.reward.icon}</span>
+                        <div className="flex-1 min-w-0">
+                            <div style={{ fontWeight: 800, fontSize: '0.875rem', textTransform: 'uppercase', color: 'var(--text-primary)' }}>
+                                {activeCoupon.reward.name}
+                            </div>
+                            <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-green)', letterSpacing: '0.1em' }}>
+                                {activeCoupon.code}
+                            </div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Expire dans</div>
+                            <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '1.2rem', color: 'var(--accent-red)' }}>
+                                {Math.floor(remaining / 60)}:{(remaining % 60).toString().padStart(2, '0')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <Navbar />
         </>
     );

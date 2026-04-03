@@ -60,6 +60,8 @@ interface EventData {
     imageUrl?: string;
     typeName?: string;
     typeEmoji?: string;
+    winnerPoints?: number;
+    secondPlacePoints?: number;
 }
 
 interface Tournament {
@@ -254,7 +256,7 @@ function TournamentContent() {
                     players: tournament.players || [],
                     matches: tournament.matches || [],
                     groups: tournament.groups || [],
-                    publicId: tournament.publicId || null,
+                    publicId: tournament.publicId || Math.random().toString(36).slice(2, 10),
                     winner: tournament.winner || null,
                     secondPlace: tournament.secondPlace || null,
                     thirdPlace: tournament.thirdPlace || null,
@@ -272,8 +274,8 @@ function TournamentContent() {
                         createdAt: serverTimestamp()
                     });
                     console.log("Tournament created:", docRef.id);
-                    // Update local state with the new ID (without triggering another save)
-                    setTournament(prev => ({ ...prev, id: docRef.id }));
+                    // Update local state with ID et publicId générés
+                    setTournament(prev => ({ ...prev, id: docRef.id, publicId: (tournamentData as any).publicId }));
                 }
 
                 setMessage("✅ Sauvegardé");
@@ -291,7 +293,7 @@ function TournamentContent() {
     }, [tournament.name, tournament.players, tournament.matches, tournament.groups, tournament.format, tournament.status, eventId, isLoading]);
 
     if (loading || isLoading || (user && !userData)) {
-        return <div className="min-h-screen flex items-center justify-center font-bold text-xl bg-[#FFC845]">CHARGEMENT...</div>;
+        return <div className="min-h-screen flex items-center justify-center font-bold text-xl" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>Chargement...</div>;
     }
 
     if (!user) return null;
@@ -926,6 +928,44 @@ function TournamentContent() {
         }
     };
 
+    // Vérifie et attribue tous les badges stats (balance, wins, events)
+    const checkAllStatBadges = async (userId: string) => {
+        try {
+            const userDoc = await getDoc(doc(db, "users", userId));
+            if (!userDoc.exists()) return;
+            const { balance = 0, wins = 0, eventsCount = 0 } = userDoc.data() as { balance?: number; wins?: number; eventsCount?: number };
+
+            const allBadges = await getDocs(query(
+                collection(db, "badges"),
+                where("conditionType", "in", ["balance", "wins", "events"])
+            ));
+
+            for (const badgeDoc of allBadges.docs) {
+                const bd = badgeDoc.data();
+                const met =
+                    (bd.conditionType === "balance" && balance >= bd.conditionValue) ||
+                    (bd.conditionType === "wins" && wins >= bd.conditionValue) ||
+                    (bd.conditionType === "events" && eventsCount >= bd.conditionValue);
+                if (!met) continue;
+
+                const userBadgesRef = collection(db, "users", userId, "badges");
+                const existing = await getDocs(query(userBadgesRef, where("name", "==", bd.name)));
+                if (existing.empty) {
+                    await addDoc(userBadgesRef, {
+                        name: bd.name,
+                        description: bd.description,
+                        icon: bd.icon,
+                        rarity: bd.rarity || "common",
+                        obtainedAt: serverTimestamp()
+                    });
+                    console.log(`Badge "${bd.name}" débloqué pour ${userId}`);
+                }
+            }
+        } catch (err) {
+            console.error("Erreur vérification badges stats:", err);
+        }
+    };
+
     // Complete tournament and save results
     const completeTournament = async () => {
         const knockoutMatches = tournament.matches.filter(m => m.phase === 'knockout');
@@ -968,15 +1008,23 @@ function TournamentContent() {
                 tournamentId = tournamentRef.id;
             }
 
+            // Points depuis l'event lié (fallback aux valeurs par défaut)
+            const p1 = eventData?.winnerPoints ?? 500;
+            const p2 = eventData?.secondPlacePoints ?? 300;
+            const p3 = Math.round(p2 * 0.5); // 3ème = moitié du 2ème
+
             // Award points to registered winners
             const rewards = [
-                { player: winner, points: 500, position: 1 },
-                { player: secondPlace, points: 300, position: 2 },
-                { player: thirdPlace, points: 150, position: 3 }
+                { player: winner, points: p1, position: 1 },
+                { player: secondPlace, points: p2, position: 2 },
+                { player: thirdPlace, points: p3, position: 3 }
             ];
+
+            const rewardedUserIds = new Set<string>();
 
             for (const reward of rewards) {
                 if (reward.player && reward.player.isRegistered && reward.player.userId) {
+                    rewardedUserIds.add(reward.player.userId);
                     await updateDoc(doc(db, "users", reward.player.userId), {
                         balance: increment(reward.points),
                         wins: reward.position === 1 ? increment(1) : increment(0),
@@ -990,6 +1038,17 @@ function TournamentContent() {
                         description: `${tournament.eventTypeName} - Position ${reward.position}`,
                         date: new Date().toISOString()
                     });
+
+                    await checkAllStatBadges(reward.player.userId);
+                }
+            }
+
+            // Incrémenter eventsCount pour tous les joueurs non-récompensés (perdants)
+            for (const player of tournament.players) {
+                if (player.isRegistered && player.userId && !rewardedUserIds.has(player.userId)) {
+                    await updateDoc(doc(db, "users", player.userId), {
+                        eventsCount: increment(1)
+                    });
                 }
             }
 
@@ -998,8 +1057,8 @@ function TournamentContent() {
                 await updateDoc(doc(db, "events", tournament.eventId), {
                     winner: winner.name,
                     secondPlace: secondPlace?.name,
-                    winnerPoints: 500,
-                    secondPlacePoints: 300,
+                    winnerPoints: p1,
+                    secondPlacePoints: p2,
                     status: "completed",
                     tournamentId,
                     completedAt: serverTimestamp()
@@ -1045,7 +1104,7 @@ function TournamentContent() {
                                     name: badgeData.name,
                                     description: badgeData.description,
                                     icon: badgeData.icon,
-                                    rarity: "rare",
+                                    rarity: badgeData.rarity || "rare",
                                     obtainedAt: serverTimestamp()
                                 });
                                 console.log(`Badge "${badgeData.name}" attribué à ${winner.name}`);
@@ -1252,7 +1311,7 @@ function TournamentContent() {
         .every(m => m.winner);
 
     return (
-        <div className="min-h-screen bg-[#FFC845] p-4">
+        <div className="min-h-screen p-4" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
             {/* Header compact */}
             <div className="max-w-2xl mx-auto mb-6">
                 <button
@@ -1959,7 +2018,7 @@ function TournamentContent() {
 
 export default function TournamentManager() {
     return (
-        <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold text-xl bg-[#FFC845]">CHARGEMENT...</div>}>
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold text-xl" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>Chargement...</div>}>
             <TournamentContent />
         </Suspense>
     );

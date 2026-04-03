@@ -79,8 +79,8 @@ export default function PublicTournament() {
                 if (player.isRegistered && player.userId) {
                     try {
                         const userDoc = await getDoc(doc(db, "users", player.userId));
-                        if (userDoc.exists() && userDoc.data().avatarUrl) {
-                            avatars[player.id] = userDoc.data().avatarUrl;
+                        if (userDoc.exists() && userDoc.data().photoURL) {
+                            avatars[player.id] = userDoc.data().photoURL;
                         }
                     } catch (err) { /* ignore */ }
                 }
@@ -139,7 +139,7 @@ export default function PublicTournament() {
 
         // For non-registered players or those without avatar, use DiceBear
         // Generate a consistent avatar based on their name using fun style
-        const diceBearUrl = `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${encodeURIComponent(player.name)}&size=${size}`;
+        const diceBearUrl = `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(player.name)}&size=${size}`;
 
         return (
             <img
@@ -198,7 +198,7 @@ export default function PublicTournament() {
             <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
             <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
 
-            <div className="min-vh-100" style={{ backgroundColor: '#FFC845' }}>
+            <div className="min-vh-100" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
                 {/* Header */}
                 <div className="bg-dark text-white">
                     {tournament.imageUrl && (

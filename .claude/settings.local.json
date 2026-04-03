@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx next:*)",
+      "Bash(ipconfig)",
+      "Bash(findstr /i \"192.168\")"
+    ]
+  }
+}

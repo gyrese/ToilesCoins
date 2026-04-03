@@ -45,35 +45,35 @@ export default function Login() {
 
     if (loading || isRedirecting) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#FFC845]">
+            <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
                 <div className="text-2xl font-black uppercase animate-bounce">Chargement...</div>
             </div>
         );
     }
 
     return (
-        <main className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 bg-[#FFC845]">
+        <main className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 bg-[var(--bg-base)]">
 
             <div className="w-full max-w-sm">
                 {/* Logo / Brand */}
                 <div className="text-center mb-8">
-                    <h1 className="text-5xl font-black uppercase italic tracking-tighter mb-2">ToilesCoins</h1>
-                    <p className="font-bold text-lg border-2 border-black inline-block px-2 bg-white transform -rotate-2">La monnaie des Toiles</p>
+                    <h1 className="font-payback text-5xl uppercase mb-2" style={{ color: 'var(--accent-gold)', textShadow: '0 0 30px rgba(255,200,69,0.25)' }}>ToilesCoins</h1>
+                    <p style={{ fontWeight: 700, fontSize: '0.85rem', border: '1px solid var(--accent-gold-border)', display: 'inline-block', padding: '3px 12px', borderRadius: 'var(--radius-pill)', color: 'var(--accent-gold)', background: 'var(--accent-gold-dim)' }}>La monnaie des Toiles</p>
                 </div>
 
                 {/* Card */}
-                <div className="neo-card">
-                    <h2 className="text-2xl font-black uppercase mb-6 text-center border-b-4 border-black pb-2">
+                <div className="dark-card dark-card--neo">
+                    <h2 className="font-payback text-xl uppercase mb-6 text-center pb-3" style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--border-default)' }}>
                         {isSignUp ? "Rejoindre le Club" : "Identification"}
                     </h2>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {isSignUp && (
                             <div>
-                                <label className="block font-bold mb-1 uppercase text-sm">Pseudo</label>
+                                <label className="dark-label">Pseudo</label>
                                 <input
                                     type="text"
-                                    className="neo-input"
+                                    className="dark-input"
                                     placeholder="Votre Blaze"
                                     value={pseudo}
                                     onChange={(e) => setPseudo(e.target.value)}
@@ -83,10 +83,10 @@ export default function Login() {
                         )}
 
                         <div>
-                            <label className="block font-bold mb-1 uppercase text-sm">Email</label>
+                            <label className="dark-label">Email</label>
                             <input
                                 type="email"
-                                className="neo-input"
+                                className="dark-input"
                                 placeholder="nom@exemple.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -95,10 +95,10 @@ export default function Login() {
                         </div>
 
                         <div>
-                            <label className="block font-bold mb-1 uppercase text-sm">Mot de passe</label>
+                            <label className="dark-label">Mot de passe</label>
                             <input
                                 type="password"
-                                className="neo-input"
+                                className="dark-input"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -107,21 +107,21 @@ export default function Login() {
                         </div>
 
                         {error && (
-                            <div className="bg-red-500 text-white font-bold p-3 border-2 border-black text-center">
+                            <div className="toast toast-error" style={{ animation: 'none' }}>
                                 {error}
                             </div>
                         )}
 
-                        <button type="submit" className="neo-btn w-full mt-4">
+                        <button type="submit" className="btn-primary mt-4">
                             {isSignUp ? "Créer mon Compte" : "Se Connecter"}
                         </button>
 
-                        <div className="relative my-6 text-center">
-                            <span className="bg-white px-2 font-bold text-sm uppercase relative z-10">Ou</span>
-                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-black -z-0"></div>
+                        <div style={{ position: 'relative', textAlign: 'center', margin: '1.25rem 0' }}>
+                            <span style={{ background: 'var(--bg-surface)', padding: '0 0.75rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', position: 'relative', zIndex: 1 }}>Ou</span>
+                            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: 'var(--border-default)', zIndex: 0 }} />
                         </div>
 
-                        <button type="button" onClick={handleGoogleSignIn} className="neo-btn neo-btn-outline w-full flex items-center justify-center gap-2">
+                        <button type="button" onClick={handleGoogleSignIn} className="btn-ghost w-full flex items-center justify-center gap-2" style={{ width: '100%' }}>
                             <span className="font-black text-xl">G</span> Google
                         </button>
 
@@ -129,7 +129,7 @@ export default function Login() {
                             <button
                                 type="button"
                                 onClick={() => { setIsSignUp(!isSignUp); setError(""); }}
-                                className="font-bold underline hover:text-gray-600 uppercase text-sm"
+                                style={{ fontWeight: 700, textDecoration: 'underline', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}
                             >
                                 {isSignUp ? "J'ai déjà un compte" : "Pas encore de compte ?"}
                             </button>
