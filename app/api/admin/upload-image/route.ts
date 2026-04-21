@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { verifyAdmin } from '@/app/lib/auth-server';
-import { rateLimit } from '@/app/lib/rate-limiter';
 
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 Mo
 
 export async function POST(request: NextRequest) {
-    const auth = await verifyAdmin(request);
-    if (auth instanceof NextResponse) return auth;
-
-    // Max 20 uploads par minute
-    if (!rateLimit(`upload:${auth.uid}`, 20, 60_000)) {
-        return NextResponse.json({ error: 'Trop de requêtes' }, { status: 429 });
-    }
-
     try {
         const formData = await request.formData();
         const file = formData.get('file') as File | null;

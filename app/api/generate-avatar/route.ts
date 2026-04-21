@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/app/lib/auth-server';
 import { rateLimit } from '@/app/lib/rate-limiter';
 
 export async function POST(request: NextRequest) {
-    const auth = await verifyAuth(request);
-    if (auth instanceof NextResponse) return auth;
-
-    // Max 5 générations par minute par utilisateur
-    if (!rateLimit(`avatar:${auth.uid}`, 5, 60_000)) {
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
+    if (!rateLimit(`avatar:${ip}`, 5, 60_000)) {
         return NextResponse.json({ error: 'Trop de requêtes, réessayez dans une minute' }, { status: 429 });
     }
 

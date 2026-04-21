@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/app/lib/auth-server';
 
 const ALLOWED_HOSTS = ['image.pollinations.ai', 'api.dicebear.com'];
 
 export async function GET(request: NextRequest) {
-    const auth = await verifyAuth(request);
-    if (auth instanceof NextResponse) return auth;
-
     try {
         const { searchParams } = new URL(request.url);
         const imageUrl = searchParams.get('url');

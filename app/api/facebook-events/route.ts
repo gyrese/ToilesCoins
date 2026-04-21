@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdmin } from '@/app/lib/auth-server';
 
-export async function GET(request: NextRequest) {
-    const auth = await verifyAdmin(request);
-    if (auth instanceof NextResponse) return auth;
-
+export async function GET(_request: NextRequest) {
     try {
         const FB_PAGE_ID = process.env.FACEBOOK_PAGE_ID;
         const FB_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN;
