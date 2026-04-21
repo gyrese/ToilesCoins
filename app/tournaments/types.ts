@@ -127,18 +127,20 @@ export const DEFAULT_REWARDS: Record<number, number> = {
     3: 150   // Troisième place
 };
 
+import type { Timestamp } from 'firebase/firestore';
+
 /**
  * Document Firestore pour un tournoi
  */
 export interface TournamentDocument extends Omit<Tournament, 'date'> {
     /** Date au format Firestore Timestamp */
-    date: FirebaseFirestore.Timestamp;
+    date: Timestamp;
 
     /** Timestamp de création Firestore */
-    createdAt: FirebaseFirestore.Timestamp;
+    createdAt: Timestamp;
 
     /** Timestamp de finalisation Firestore */
-    completedAt?: FirebaseFirestore.Timestamp;
+    completedAt?: Timestamp;
 }
 
 /**
